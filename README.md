@@ -23,19 +23,26 @@ AI 코딩 에이전트에서 사용하는 개인 스킬 모음이다. 현재 `bu
 
 Codex와 Claude Code가 동일한 플러그인과 스킬 본문을 사용한다. 사용자가 저장소를 직접 clone하거나 스킬 디렉터리에 심볼릭 링크를 만들 필요는 없다.
 
+제품마다 원격 플러그인을 선언하는 방식은 서로 다르다.
+
+| 제품 | 원격 설치 방식 | 이 저장소의 지원 상태 |
+| --- | --- | --- |
+| Codex | Git marketplace 등록 후 plugin 설치 | 지원 |
+| Claude Code | 설정 또는 CLI로 Git marketplace와 plugin 선언 | 지원 |
+| OpenCode | `plugin` 배열의 NPM 실행 모듈 | 별도 어댑터가 필요함 |
+
 ## Codex
 
-저장소를 marketplace로 등록한다.
+저장소를 marketplace로 등록하고 플러그인을 설치한다.
 
 ```sh
 codex plugin marketplace add insd47/skills
-```
-
-Codex marketplace에서는 `build`를 기본 설치 플러그인으로 선언한다. 자동 설치되지 않은 환경에서는 다음 명령으로 설치한다.
-
-```sh
 codex plugin add build@insd-skills
 ```
+
+두 명령 모두 Codex가 GitHub 저장소를 자체 cache로 가져오므로 사용자가 clone할 필요가 없다. bootstrap을 맡은 에이전트에는 위 두 명령을 실행하도록 요청하면 된다.
+
+현재 Codex CLI에서는 `config.toml`에 marketplace URL과 plugin ID만 직접 적은 깨끗한 환경에서 marketplace snapshot을 내려받지 않는다. 따라서 선언만 복사하는 방식보다 `marketplace add`를 공식 bootstrap 단계로 사용해야 한다. marketplace의 `INSTALLED_BY_DEFAULT` 정책도 선언했지만, 새 CLI 환경에서는 명시적인 `plugin add`까지 실행하는 것이 확실하다.
 
 업데이트는 marketplace snapshot을 갱신한 뒤 플러그인을 다시 설치하는 방식으로 적용한다.
 
@@ -101,7 +108,7 @@ OpenCode의 `plugin` 배열은 Git marketplace나 Agent Skill 패키지를 설�
 
 첫 번째 방식은 기존 Agent Skill과 가장 잘 호환되지만, 플러그인이 시작할 때 사용자 설정 디렉터리에 파일을 쓰는 부작용이 있다. 두 번째 방식은 파일을 설치하지 않지만 OpenCode 전용 구현이 되고 다른 에이전트와 동일한 `skill` 호출 경험을 제공하지 못한다.
 
-현재 저장소는 Codex와 Claude Code의 공식 marketplace 방식까지만 제공한다. OpenCode의 `plugin` 배열과 동일한 설치 경험이 반드시 필요할 때 `@insd47/opencode-build` NPM 어댑터를 별도로 추가하는 것이 적절하다.
+현재 저장소는 Codex와 Claude Code의 공식 marketplace 방식까지만 제공한다. OpenCode의 `plugin` 배열과 동일한 설치 경험이 반드시 필요할 때만 `@insd47/opencode-build` NPM 어댑터를 별도로 추가하는 것이 적절하다. 단순한 문서 배포를 위해 사용자 설정 디렉터리에 파일을 쓰는 NPM 패키지를 지금 추가하는 것은 유지보수 비용과 부작용에 비해 이점이 작다.
 
 ## 스킬 개발
 
