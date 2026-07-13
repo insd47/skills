@@ -1,0 +1,24 @@
+{
+  "name": "build",
+  "version": "0.1.0",
+  "description": "개인 구현 원칙을 적용하는 Build 스킬",
+  "author": {
+    "name": "황인성",
+    "url": "https://github.com/insd47"
+  },
+  "homepage": "https://github.com/insd47/skills",
+  "repository": "https://github.com/insd47/skills",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Build",
+    "shortDescription": "계층적 모듈과 단순한 조립을 중심으로 구현합니다.",
+    "longDescription": "황인성의 모듈 경계, 접근제어, 조립, 대칭성, 타입 및 오류 처리 감각을 적용해 소프트웨어를 구현하고 리팩터링합니다.",
+    "developerName": "황인성",
+    "category": "Developer Tools",
+    "capabilities": ["Write"],
+    "defaultPrompt": [
+      "이 기능을 내 모듈화 원칙에 맞춰 구현해 줘.",
+      "이 코드를 구조적으로 깔끔하게 리팩터링해 줘."
+    ]
+  }
+}

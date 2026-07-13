@@ -1,0 +1,20 @@
+{
+  "name": "insd-skills",
+  "interface": {
+    "displayName": "황인성의 Skills"
+  },
+  "plugins": [
+    {
+      "name": "build",
+      "source": {
+        "source": "local",
+        "path": "./plugins/build"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
