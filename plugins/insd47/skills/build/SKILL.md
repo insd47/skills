@@ -7,6 +7,17 @@ description: Build, modify, or refactor software in Insung Hwang's personal engi
 
 Implement working software whose structure is understandable from its module tree and top-level composition.
 
+## Hold the core values
+
+Every rule in this skill serves one philosophy: SOLID and YAGNI as the structural backbone, in service of clean, beautiful, human-readable code. Concretely, each rule protects one or more of these four named values:
+
+- **Flow** — the level of abstraction is right, so control and meaning read top-to-bottom like a narrative.
+- **Balance** — responsibility is distributed where it belongs, so each module owns one coherent concern.
+- **Uniformity** — similar problems look similar across the project, so one understanding transfers everywhere.
+- **Beauty** — code stays visually clean through the formatter; a forced wrap that makes similar structures look different is a defect to design away, not to accept.
+
+Each section below names its intent. When a rule does not cover your situation, choose the option that best preserves the named intent. When two rules appear to conflict, the intent decides.
+
 ## Instruction priority
 
 Apply these rules in order:
@@ -28,6 +39,8 @@ Do not invoke SOLID to add ceremonial interfaces, factories, layers, or dependen
 
 ## Work from evidence
 
+**Intent:** Uniformity — a change should read as if the codebase grew it, so understanding gained anywhere in the project transfers to the new code.
+
 Before designing or editing:
 
 1. Read repository instructions, manifests, and relevant framework documentation.
@@ -39,6 +52,8 @@ Before designing or editing:
 Prefer extending an established local pattern over inventing a parallel one. Correct a local inconsistency only when it is in scope or prevents a coherent implementation.
 
 ## Design the semantic tree
+
+**Intent:** Balance — the tree is where responsibility gets distributed; a reader should learn what the system is and who owns what from the module tree alone.
 
 Treat the module tree as both a map of meaning and a map of authority.
 
@@ -64,6 +79,8 @@ Aim for one cohesive reason to understand or change a file, not mechanically one
 
 ## Expose the smallest natural surface
 
+**Intent:** Balance — when boundaries are drawn correctly, access control falls out of plain visibility; a strained visibility trick is a symptom of a misplaced boundary, never a tool.
+
 Keep declarations private by default. Make an item visible only as far as the nearest common ancestor of its real consumers.
 
 Use these meanings:
@@ -78,6 +95,8 @@ Do not create catch-all barrel files. Do not re-export every child declaration f
 When deciding where an item belongs, ask: "What is the lowest module that can honestly own this name and still serve every real consumer?"
 
 ## Compose one level at a time
+
+**Intent:** Flow — each level of composition is a short story about the level below, so the whole system explains itself top-down without opening leaves.
 
 Treat composition roots as recursive, not unique.
 
@@ -99,18 +118,30 @@ The top level should reveal system topology and execution order, not low-level c
 
 ## Optimize for readable shape
 
+**Intent:** Uniformity and beauty — parallel concepts look parallel, and the shape survives the formatter unchanged.
+
 Treat visual structure as part of maintainability.
 
 - Make sibling modules structurally symmetrical when they represent parallel concepts.
 - Keep comparable declarations in comparable positions.
-- Use blank lines to separate semantic phases.
 - Prefer top-to-bottom control flow that reads as a narrative.
 - Keep the principal operation or export easy to find.
 - Accept small, measured runtime or allocation costs when they materially improve clarity and do not threaten actual requirements.
 
+Apply one vertical rhythm in every language:
+
+- Pack consecutive single-line statements and declarations together with no blank lines between them.
+- Put one blank line above and below every multi-line construct — a block, a loop, a match or conditional with a body, a multi-line call or literal, a long method chain — except at the start or end of its enclosing block.
+- Put a blank line after an early-return guard before the main work resumes.
+- When single-line statements accumulate into a long run, split them into logically grouped clusters separated by blank lines.
+
+When the formatter would wrap a long line awkwardly, restructure the line instead of accepting the wrap: extract an intermediate constant with a meaningful name, split arguments into semantic units, or move the expression out of the call site. An ugly forced wrap is a defect in the line, not a formatter setting to fight.
+
 Do not remove harmless duplication if it preserves useful symmetry. Abstract repeated code only when the abstraction has one honest name, reduces conceptual load, and represents a stable shared rule.
 
 ## Use types selectively
+
+**Intent:** Flow — a type appears exactly where meaning crosses a boundary, so the reader is neither starved of contracts nor drowned in restated inference.
 
 Prefer inference for local values and implementation details. Introduce a named type when it carries information across a meaningful boundary or protects a real rule, such as:
 
@@ -124,6 +155,8 @@ Do not create wrapper types, configuration objects, interfaces, or traits merely
 
 ## Choose the simplest useful error model
 
+**Intent:** Balance — error detail lives exactly where a decision is made with it; anything more is ceremony, anything less erases diagnosis.
+
 Model errors according to the distinctions the current caller needs, not according to a universal layer policy.
 
 - Preserve detailed local errors when a component has several meaningful failure modes that aid diagnosis or recovery.
@@ -134,6 +167,8 @@ Model errors according to the distinctions the current caller needs, not accordi
 Do not force every module to have its own error enum. Do not erase useful device, protocol, validation, or boundary failures into strings for superficial uniformity.
 
 ## Apply SOLID without ceremony
+
+**Intent:** SOLID is the skeleton of balance — it guards how responsibility is distributed, and must never manufacture structure that no current code needs.
 
 Use SOLID as questions, not quotas:
 
@@ -146,6 +181,8 @@ Use SOLID as questions, not quotas:
 Prefer a direct concrete dependency over a one-implementation abstraction. Introduce an interface or trait when there are multiple implementations, an actual replacement boundary, or a test seam that cannot be achieved more simply.
 
 ## Apply YAGNI without damaging structure
+
+**Intent:** YAGNI protects flow — it removes imagined variation, but must never buy simplicity by erasing a boundary that carries present-day meaning.
 
 Implement the smallest complete design for the current behavior.
 
@@ -163,6 +200,8 @@ YAGNI removes imagined variation, not present-day meaning. Keep a module boundar
 
 ## Implement in a readable order
 
+**Intent:** An order that surfaces each value while it is still cheap to fix — boundaries before code, symmetry before handoff.
+
 1. Identify the affected semantic subtree and its public boundary.
 2. Decide which module owns each new behavior and dependency.
 3. Decide the nearest common ancestor for each shared declaration.
@@ -173,6 +212,8 @@ YAGNI removes imagined variation, not present-day meaning. Keep a module boundar
 8. Verify behavior and report remaining uncertainty.
 
 ## Build a proportional verification harness
+
+**Intent:** Proportionality — this section exists to stop reflexive over-verification; run the cheapest evidence that could disprove the change, expand only as risk demands, and stop once the risk is answered.
 
 Do not wait for the user to prescribe tests. Discover available scripts, existing test conventions, and the cheapest evidence that could disprove the implementation.
 
@@ -188,6 +229,8 @@ Run the narrowest relevant check first, then expand in proportion to risk: forma
 
 Do not create elaborate mocks, generic test frameworks, or dependency abstractions for a single trivial assertion. Do not skip verification merely because the repository lacks a ready-made command. State exactly which checks ran and which did not.
 
+Once the identified risk is answered, stop. Do not re-run suites that already passed, re-verify behavior the change cannot have touched, or add checks for their own sake.
+
 ## Final audit
 
 Before handing off, confirm:
@@ -201,3 +244,4 @@ Before handing off, confirm:
 - SOLID improved the design without adding ceremony.
 - YAGNI removed speculation without flattening meaning.
 - Verification is proportional to the risk of the change.
+- The source shape survives the formatter without awkward wraps.
