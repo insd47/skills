@@ -90,26 +90,6 @@ Claude Code 설정에 marketplace와 플러그인을 선언할 수도 있다.
 
 이 설정을 사용자 또는 프로젝트 설정에 넣으면 저장소를 직접 clone하지 않고 marketplace와 플러그인을 가져올 수 있다.
 
-## OpenCode
-
-OpenCode의 `plugin` 배열은 Git marketplace나 Agent Skill 패키지를 설치하는 기능이 아니다. 배열에 지정한 NPM 패키지를 Bun으로 설치한 뒤 JavaScript 또는 TypeScript hook으로 실행한다.
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@insd47/opencode-build"]
-}
-```
-
-따라서 위와 같은 설정만으로 `build` 스킬을 제공하려면 별도의 NPM 플러그인 어댑터가 필요하다. 어댑터는 다음 중 하나를 수행해야 한다.
-
-1. 패키지에 포함한 `SKILL.md`를 OpenCode의 전역 스킬 디렉터리에 동기화한다.
-2. OpenCode plugin API로 별도의 tool이나 hook을 제공해 스킬 내용을 동적으로 주입한다.
-
-첫 번째 방식은 기존 Agent Skill과 가장 잘 호환되지만, 플러그인이 시작할 때 사용자 설정 디렉터리에 파일을 쓰는 부작용이 있다. 두 번째 방식은 파일을 설치하지 않지만 OpenCode 전용 구현이 되고 다른 에이전트와 동일한 `skill` 호출 경험을 제공하지 못한다.
-
-현재 저장소는 Codex와 Claude Code의 공식 marketplace 방식까지만 제공한다. OpenCode의 `plugin` 배열과 동일한 설치 경험이 반드시 필요할 때만 `@insd47/opencode-build` NPM 어댑터를 별도로 추가하는 것이 적절하다. 단순한 문서 배포를 위해 사용자 설정 디렉터리에 파일을 쓰는 NPM 패키지를 지금 추가하는 것은 유지보수 비용과 부작용에 비해 이점이 작다.
-
 ## 스킬 개발
 
 핵심 구현 규칙은 [`plugins/build/skills/build/SKILL.md`](plugins/build/skills/build/SKILL.md)에 있다. 언어별 규칙은 실제 작업 언어에 따라 선택적으로 로드한다.
