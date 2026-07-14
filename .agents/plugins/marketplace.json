@@ -1,14 +1,14 @@
 {
-  "name": "insd-skills",
+  "name": "insd47-skills",
   "interface": {
     "displayName": "황인성의 Skills"
   },
   "plugins": [
     {
-      "name": "build",
+      "name": "insd47",
       "source": {
         "source": "local",
-        "path": "./plugins/build"
+        "path": "./plugins/insd47"
       },
       "policy": {
         "installation": "INSTALLED_BY_DEFAULT",

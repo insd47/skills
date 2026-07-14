@@ -1,0 +1,4 @@
+interface:
+  display_name: "Build"
+  short_description: "Build clear software with hierarchical modules"
+  default_prompt: "Use $insd47:build to implement this change with my module boundaries and composition style."
