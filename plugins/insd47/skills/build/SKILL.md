@@ -130,6 +130,7 @@ Treat visual structure as part of maintainability.
 
 Apply one vertical rhythm in every language:
 
+- Keep top-level import and use statements as one packed block with no blank lines inside it, even across grouping conventions — IDEs fold the import region automatically, and a single packed block collapses into one hidden line.
 - Pack consecutive single-line statements and declarations together with no blank lines between them.
 - Put one blank line above and below every multi-line construct — a block, a loop, a match or conditional with a body, a multi-line call or literal, a long method chain — except at the start or end of its enclosing block.
 - Put a blank line after an early-return guard before the main work resumes.

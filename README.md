@@ -64,6 +64,15 @@ claude plugin install insd47@insd47-skills
 /reload-plugins
 ```
 
+업데이트는 marketplace snapshot을 갱신한 뒤 플러그인을 최신 버전으로 올리는 방식으로 적용한다.
+
+```sh
+claude plugin marketplace update insd47-skills
+claude plugin update insd47@insd47-skills
+```
+
+플러그인 업데이트는 재시작해야 반영되므로 세션을 다시 시작하거나 `/reload-plugins`로 갱신한다.
+
 호출 이름은 `/insd47:build`다. Claude Code 플러그인의 스킬 이름은 충돌 방지를 위해 항상 plugin namespace를 포함한다.
 
 ## 스킬 개발
