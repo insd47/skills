@@ -13,10 +13,12 @@ Every rule in this skill serves one philosophy: SOLID and YAGNI as the structura
 
 - **Flow** — the level of abstraction is right, so control and meaning read top-to-bottom like a narrative.
 - **Balance** — responsibility is distributed where it belongs, so each module owns one coherent concern.
-- **Uniformity** — similar problems look similar across the project, so one understanding transfers everywhere.
+- **Uniformity** — similar problems look similar across the project, so one understanding transfers everywhere (the principle of least astonishment).
 - **Beauty** — code stays visually clean through the formatter; a forced wrap that makes similar structures look different is a defect to design away, not to accept.
 
 Each section below names its intent. When a rule does not cover your situation, choose the option that best preserves the named intent. When two rules appear to conflict, the intent decides.
+
+Rules anchor to canonical engineering concepts — information hiding, least privilege, the single level of abstraction principle, the stepdown rule, Chesterton's fence — because a named idea you already understand deeply is the shortest reliable instruction. Where this style deliberately deviates from a maxim's popular reading (reflexive DRY, one type per file, distance-based visibility), the section says so; the local rule wins over the folklore.
 
 ## Instruction priority
 
@@ -51,11 +53,13 @@ Before designing or editing:
 
 Prefer extending an established local pattern over inventing a parallel one. Correct a local inconsistency only when it is in scope or prevents a coherent implementation.
 
+Two maxims govern this section. Chesterton's fence: do not remove or bypass structure you cannot yet explain. Do not reinvent the wheel: prefer the standard library, the framework idiom, and dependencies already in the manifest over hand-rolled equivalents — but do not add a new dependency for a need a few honest lines can cover.
+
 ## Design the semantic tree
 
 **Intent:** Balance — the tree is where responsibility gets distributed; a reader should learn what the system is and who owns what from the module tree alone.
 
-Treat the module tree as both a map of meaning and a map of authority.
+Treat the module tree as both a map of meaning and a map of authority. This is high cohesion and low coupling made visible: cohesion decides what lives together, coupling decides what stays apart.
 
 Create a child module when a part develops one or more of these:
 
@@ -81,7 +85,7 @@ Aim for one cohesive reason to understand or change a file, not mechanically one
 
 **Intent:** Balance — when boundaries are drawn correctly, access control falls out of plain visibility; a strained visibility trick is a symptom of a misplaced boundary, never a tool.
 
-Keep declarations private by default. Make an item visible only as far as the nearest common ancestor of its real consumers.
+Keep declarations private by default. Make an item visible only as far as the nearest common ancestor of its real consumers. This is information hiding under the principle of least privilege: a module publishes decisions, not mechanisms.
 
 Use these meanings:
 
@@ -100,7 +104,7 @@ When deciding where an item belongs, ask: "What is the lowest module that can ho
 
 Treat composition roots as recursive, not unique.
 
-Each parent should assemble only concepts from the next semantic level. It may know its direct children, but it should not manually wire their internal descendants.
+Each parent should assemble only concepts from the next semantic level — the single level of abstraction principle applied to composition. It may know its direct children, but it should not manually wire their internal descendants.
 
 Keep top-level entrypoints as short, readable stories of the system:
 
@@ -128,6 +132,8 @@ Treat visual structure as part of maintainability.
 - Keep the principal operation or export easy to find.
 - Accept small, measured runtime or allocation costs when they materially improve clarity and do not threaten actual requirements.
 
+Order declarations top-down by abstraction — the stepdown rule: a file reads like a newspaper, headline first, detail below. The representative, most caller-facing declaration leads the file, and each supporting declaration follows in the order a reader first meets it while unrolling the one above. A reader scans the flow first, then descends into each abstraction exactly where it appears — never scrolling up to find a definition. In a model file this means the root type comes first and its constituent types follow in reference order, root to leaf; tests and private plumbing sit at the bottom.
+
 Apply one vertical rhythm in every language:
 
 - Keep top-level import and use statements as one packed block with no blank lines inside it, even across grouping conventions — IDEs fold the import region automatically, and a single packed block collapses into one hidden line.
@@ -138,7 +144,7 @@ Apply one vertical rhythm in every language:
 
 When the formatter would wrap a long line awkwardly, restructure the line instead of accepting the wrap: extract an intermediate constant with a meaningful name, split arguments into semantic units, or move the expression out of the call site. An ugly forced wrap is a defect in the line, not a formatter setting to fight.
 
-Do not remove harmless duplication if it preserves useful symmetry. Abstract repeated code only when the abstraction has one honest name, reduces conceptual load, and represents a stable shared rule.
+Do not remove harmless duplication if it preserves useful symmetry — duplication is far cheaper than the wrong abstraction. This deliberately overrides reflexive DRY: abstract repeated code only when the abstraction has one honest name, reduces conceptual load, and represents a stable shared rule.
 
 ## Use types selectively
 
@@ -152,7 +158,7 @@ Prefer inference for local values and implementation details. Introduce a named 
 - a public result that downstream composition depends on;
 - an error distinction callers can act on.
 
-Do not create wrapper types, configuration objects, interfaces, or traits merely to make the design look formal. A type must clarify ownership, constrain invalid states, or stabilize a shared contract.
+Do not create wrapper types, configuration objects, interfaces, or traits merely to make the design look formal. A type must clarify ownership, constrain invalid states, or stabilize a shared contract. When a type earns its place, let it make illegal states unrepresentable instead of documenting validity in prose.
 
 ## Choose the simplest useful error model
 
@@ -221,7 +227,7 @@ Do not wait for the user to prescribe tests. Discover available scripts, existin
 Use risk to choose the harness:
 
 - For a pure rule or bug, add a focused unit or regression test.
-- For a module boundary, test through its public surface rather than private helpers.
+- For a module boundary, test behavior, not implementation: go through its public surface rather than private helpers.
 - For serialization, protocols, generated configuration, or infrastructure, verify representative boundary artifacts.
 - For UI behavior, verify the rendered interaction when practical; do not rely only on type checking.
 - For hardware or unavailable external systems, isolate and test pure transformations, then clearly state what requires real-device verification.

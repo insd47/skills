@@ -87,6 +87,8 @@ Do not add return annotations or standalone interfaces merely to restate obvious
 
 Keep local `Props`, `State`, and `Actions` declarations at the bottom of the file, below everything that uses them. Place a large public domain contract in a dedicated module when it becomes an independent concept.
 
+When types are the module's subject — a domain-model or wire-contract file — order them top-down instead: the root contract leads, and its constituent types follow in the order they are first referenced, root to leaf. Both placements serve the same principle: the file's main story comes first, and supporting detail appears where the reader meets it.
+
 ## Compose React instead of abstracting prematurely
 
 **Intent:** Balance — composition keeps each piece's responsibility visible in the JSX; premature abstraction hides it behind configuration.
@@ -154,7 +156,7 @@ Use this pattern only for real sibling modules. Do not manufacture `run` functio
 
 Use framework-native exceptions and validation failures when callers only need success or failure. Introduce discriminated errors or result unions when callers make different decisions for different failures.
 
-Validate unknown external data at the boundary with a schema named `scheme`, and keep internal values strongly inferred from that validation. Include the offending value in boundary error messages. Do not spread `unknown`, casts, or duplicated DTO types through the application.
+Parse, don't validate: consume unknown external data through a schema named `scheme` at the boundary, and keep internal values strongly inferred from that validation — past the boundary, the type system carries the proof. Include the offending value in boundary error messages. Do not spread `unknown`, casts, or duplicated DTO types through the application.
 
 ## Follow the naming register
 

@@ -27,7 +27,7 @@ Within this tree:
 
 For example, keep an internal command at `device::command::Command`, expose a specialized state as `device::Status`, and optionally lift the representative device again as `devices::Device`.
 
-Never use `pub(crate)` or `pub(super)`. A module tree whose responsibilities are separated correctly achieves access control naturally with plain `pub` behind private ancestors; reaching for distance-based visibility is a signal that a boundary is drawn in the wrong place. Reshape the module boundary or selectively re-export the item at its nearest honest ancestor instead. If existing code contains `pub(crate)` or `pub(super)`, treat it as a mistake to clean up when in scope, not a convention to extend.
+Never use `pub(crate)` or `pub(super)`. A module tree whose responsibilities are separated correctly achieves access control naturally with plain `pub` behind private ancestors; reaching for distance-based visibility is a signal that a boundary is drawn in the wrong place. Reshape the module boundary or selectively re-export the item at its nearest honest ancestor instead. If existing code contains `pub(crate)` or `pub(super)`, treat it as a mistake to clean up when in scope, not a convention to extend — the Boy Scout rule, bounded to the code you already touch.
 
 ## Let parents own semantic facades
 
@@ -80,7 +80,7 @@ Follow these micro-conventions:
 
 **Intent:** Balance — a public type is a granted responsibility; it must encode a domain value, an invariant, or a contract, not decoration.
 
-Use structs and enums to encode domain values, protocol states, aggregates, and invariants. Prefer inference for local values.
+Use structs and enums to encode domain values, protocol states, aggregates, and invariants — make illegal states unrepresentable when the domain allows it: an enum over a validated flag pair, a typed unit over a bare integer. Prefer inference for local values.
 
 - Keep fields private when callers should use a stable interpretation; expose narrow accessor methods with domain meaning.
 - Reserve fully public fields for composition aggregates and wire or storage model structs.
@@ -134,6 +134,8 @@ Keep the representative public API easy to find. Use a consistent order among si
 4. representative public types and implementations;
 5. private helpers and local supporting types;
 6. tests.
+
+Within the types section, lead with the top-level type and let its supporting types follow in the order they are first referenced from above, root to leaf. A model file reads like unrolling one abstraction at a time: the event enum first, then the status enum it embeds, then the result struct, then the per-run struct the result is built from. The reader meets each definition just after the type that needs it — never by scrolling up.
 
 Follow `rustfmt`. Within it, apply the vertical rhythm from `SKILL.md` concretely:
 
