@@ -2,174 +2,85 @@
 
 Apply this guide together with the parent `SKILL.md` when Rust files are in scope.
 
-## Use the module tree as the visibility system
+## Visibility: plain `pub` behind private ancestors
 
-**Intent:** Balance — correctly drawn boundaries make plain `pub` sufficient; distance-based visibility is the symptom of a misdrawn boundary.
+The module tree is the entire access-control mechanism.
 
-Prefer ordinary `mod`, `pub`, and selective `pub use` over distance-based visibility modifiers.
+- `mod child;` is private by default; a `pub` item inside it is a subtree contract — the private ancestor seals it from the outside.
+- `pub use` at the parent adopts a concept into the parent's vocabulary.
+- `pub mod child;` when callers deliberately enter the subdomain. Trigger: caller code naturally reads with the child's path (`infra::judge::JudgeStream`) and imports several of its items. When this trigger fires, prefer `pub mod` over re-exporting the child's vocabulary item by item.
+- **Never `pub(crate)` or `pub(super)` in production code.** Needing one means a boundary is misdrawn — reshape the tree or re-export at the honest ancestor until plain `pub` behind private ancestors suffices. Treat existing ones as cleanup targets when in scope.
+- Single exception: `#[cfg(test)]` seams. A test-only fixture (`pub(super) fn stub()`) may use `pub(super)`, because plain `pub` would falsely invite production callers. The distance modifier is the true signal here: "tests in this subtree only."
 
-```text
-device
-├── channel
-├── command
-├── protocol
-├── status
-└── error
-```
+## Facades own their subtree's story
 
-Within this tree:
+A parent module holds child declarations, selective re-exports, the representative types, and high-level operations in domain vocabulary. Mechanisms move into children once they acquire their own state, protocol, or collaborators.
 
-- Keep implementation modules private with `mod child;`.
-- Mark an item in a private child `pub` when its parent or sibling descendants need it. The private ancestor still prevents external access.
-- Re-export an item from the parent when external callers need that concept.
-- Make the child module itself `pub` only when it is a meaningful public subdomain.
-- Re-export the representative type at the parent when ordinary callers should not need the specialized path.
+- The service method is the only door: `judge.invoke(request)`, never a caller reaching for `invoke::run(&judge.client, ...)`.
+- Construction of child concepts happens in the parent that owns them; the executable entrypoint connects major aggregates only.
+- Prefer concrete types until a real substitution boundary exists (see the structure razor in `SKILL.md`).
 
-For example, keep an internal command at `device::command::Command`, expose a specialized state as `device::Status`, and optionally lift the representative device again as `devices::Device`.
+## Shape of flow
 
-Never use `pub(crate)` or `pub(super)`. A module tree whose responsibilities are separated correctly achieves access control naturally with plain `pub` behind private ancestors; reaching for distance-based visibility is a signal that a boundary is drawn in the wrong place. Reshape the module boundary or selectively re-export the item at its nearest honest ancestor instead. If existing code contains `pub(crate)` or `pub(super)`, treat it as a mistake to clean up when in scope, not a convention to extend — the Boy Scout rule, bounded to the code you already touch.
+- Prefer an explicit loop generator over a combinator chain when termination is part of the meaning: an `async_stream` generator with a visible `break` on the completion frame beats `try_unfold` + `filter_map` whose end condition hides inside a `None`. Combinators are for per-item mapping; loops are for protocol control flow.
+- `let .. else` for compute-or-bail bindings; `if let` for optional side effects; `match` for exhaustive dispatch.
+- Struct literals whose fields are all mandatory stay literals — do not write a constructor that merely relocates the same nine arguments.
+- Builders are earned only by construction with modes or invariants that callers must not hand-assemble (preset entry points encoding a safety rule); plain aggregates use literals or `new`.
+- Write narrowing conversions with a visible clamp, never a bare `as` that can silently truncate.
+- Guard early, return early; a blank line follows each guard before the main work resumes.
 
-## Let parents own semantic facades
+## Names in Rust
 
-**Intent:** Flow — a parent tells its subtree's story in domain vocabulary, so callers never need to read the mechanisms below.
+- Modules are worlds, functions are yields: `stream::payload(response)`, `stream::sse(payloads)`.
+- One-word methods where the receiver disambiguates: `run`, `read`, `parse`, `status`. Longer names only when units, direction, or protocol meaning would be lost.
+- `try_run` is the `Result` core behind an infallible `run` shell.
+- Units in numeric boundary names when confusion is plausible: `duration_ms`, `memory_limit_bytes`.
+- Name loop variables and closure parameters semantically (`col`, `previous`, `|left, right|`), never `i` or `|a, b|`.
+- Generic parameters carry their trait's name (`UART: Uart`); state mutators take `mark_`/`set_`; getters stay bare nouns.
 
-Keep a parent module focused on:
+## Errors in Rust
 
-- child declarations and selective re-exports;
-- the representative public struct, enum, trait, or functions;
-- construction of direct child concepts;
-- high-level operations expressed in domain vocabulary.
+- Contract crates (models, wire types): thiserror enums; a new variant only for a new handling decision; messages are plain strings inside variants.
+- Plumbing, services, and background tasks: anyhow end to end. `.context("Recorded reason.")` at each meaning boundary; the sink logs the chain once with `{error:#}` and records `error.to_string()` (outermost reason only). No per-site `inspect_err`/`map_err` ladders.
+- Expected absence: `find(...)?.ok_or(...)` — absence is a value, not a `NotFound` translated later. `get` is for must-exist lookups.
+- Detached tokio tasks: `pub async fn run(self, ..)` swallows into one sink; `async fn try_run(&self, ..) -> Result<()>` flows with `?`. A `JoinHandle` nobody joins swallows errors silently — never rely on it.
+- Shape each `error.rs` the same way: `pub type Result<T> = ...;` colocated with the enum; wrap an underlying error as a transparent `#[from]` variant; skip a local enum entirely when the module adds no decision over the underlying error.
 
-Move mechanisms into children once they acquire their own state, protocol, invariant, or collaborators. Keep small private helper functions when they are merely steps of the same responsibility.
+## Constants
 
-Do not mechanically create one file per struct. Keep tightly coupled request/response frames or a cohesive wire-model family together.
+Name every magic number. Timing and tuning constants sit at the top of the using file, typed as what they represent (`const KEEP_ALIVE: Duration = Duration::from_secs(15);`). Wire constants — addresses, control bytes, frame layouts — get a dedicated `command`/`protocol`/`params` module. Compute derived constants from their sources; group digits with underscores.
 
-## Compose ownership explicitly
+## Concurrency
 
-**Intent:** Flow — ownership transfer is the plot of a systems program; constructors and aggregates make it visible.
+Async marks genuine waiting. `tokio::spawn` appears at the assembly point so task lifetime is visible where the system is wired; the spawned future returns `()` and handles its own failures. Join tasks only when they form one logical operation. Keep timeouts explicit and domain-readable.
 
-Use constructors and aggregates to make ownership transfers visible.
+## Source shape
 
-- Put exclusive platform resources and their mapping in one composition module.
-- Construct low-level drivers inside the module that owns the hardware or runtime detail.
-- Pass completed capabilities into services or policies.
-- Let the executable entrypoint connect major aggregates and retain only the resources it directly coordinates.
+Follow `rustfmt`; within it, keep one vertical rhythm:
 
-When construction grows, add an intermediate `init`, `build`, or domain-named composition function in the immediate parent. Avoid a generic service locator or dependency container.
-
-Prefer concrete types until a real substitution boundary exists. Add a trait for actual polymorphism, a stable external contract, or a necessary test seam—not solely to satisfy dependency inversion.
-
-## Choose precise but contextual names
-
-**Intent:** Flow — the module and receiver carry context, so names stay short where the context speaks and grow only where meaning would be lost.
-
-Let modules and types carry nouns; let methods carry concise actions.
-
-Prefer contextual names such as `run`, `show`, `read`, `write`, `parse`, `status`, or `work` when the receiver and module make them unambiguous. Use longer names when units, direction, or protocol meaning would otherwise be lost.
-
-Include units in numeric boundary names when confusion is plausible, such as `duration_ms`, `pulse_bpm`, or `alcohol_mg_l_x1000`.
-
-Follow these micro-conventions:
-
-- Suffix representative device and service types with their role (`AlcoholDevice`, `MeasureService`); keep enums and variants as bare domain nouns.
-- Name generic parameters after the trait they carry (`UART: Uart`, `I2C: I2c`); use the lifetime `'d` for device-held borrows.
-- Prefix state mutators with `mark_` or `set_`; keep getters as bare nouns (`window`, `total_samples`).
-- Name loop variables and closure parameters semantically (`col`, `row`, `previous`, `next`, `|left, right|`), not `i` or `|a, b|`.
-
-## Keep public types meaningful
-
-**Intent:** Balance — a public type is a granted responsibility; it must encode a domain value, an invariant, or a contract, not decoration.
-
-Use structs and enums to encode domain values, protocol states, aggregates, and invariants — make illegal states unrepresentable when the domain allows it: an enum over a validated flag pair, a typed unit over a bare integer. Prefer inference for local values.
-
-- Keep fields private when callers should use a stable interpretation; expose narrow accessor methods with domain meaning.
-- Reserve fully public fields for composition aggregates and wire or storage model structs.
-- Derive standard traits when they serve real use; let tooling order the derive list.
-- Construct with `new` returning `Self`, or `Result<Self>` when construction can fail. Do not introduce builders or `try_new` variants.
-- Use type aliases such as `Result<T>` when they simplify a cohesive error domain, and local aliases to tame long generic HAL types (`type PpgChannel<'d> = AdcChannelDriver<'d, ...>;`).
-- Avoid configuration structs that only move constructor arguments without clarifying a boundary.
-
-## Place constants deliberately
-
-**Intent:** Uniformity — every magic number has exactly one named home, so tuning and protocol facts are found where the domain says they live.
-
-Name every magic number. Keep timing and tuning constants at the top of the file that uses them, typed as what they represent (`const DEBOUNCE: Duration = Duration::from_millis(80);`). Give a device's wire constants — addresses, control bytes, register tables, frame layout — a dedicated `command`, `protocol`, or `params` module.
-
-- Name module constants in SCREAMING_SNAKE, adding a unit token when confusion is plausible (`SAMPLE_PERIOD_MS`, `DEBOUNCE`).
-- Compute derived constants from their sources (`const PAGES: usize = HEIGHT / 8;`) instead of restating results.
-- Group digits with underscores (`Hertz(9_600)`, `60_000.0`) and use typed literal suffixes where the type is not obvious in context (`0_u8`, `10_f32`).
-
-## Scale errors to the component
-
-**Intent:** Balance — error detail lives where a handling decision is made with it.
-
-Give a device, parser, or protocol its own error enum when it has several meaningful local failures. Preserve driver errors transparently when useful.
-
-Use a shared application error when an orchestration module primarily propagates existing failures. Do not create a service-specific error that merely wraps the same variants without adding a handling decision.
-
-Use `?` and conversion traits for straightforward propagation. Recover, retry, warn, or suppress only where enough context exists to make that decision.
-
-Shape each `error.rs` the same way:
-
-- Colocate `pub type Result<T> = core::result::Result<T, Error>;` with the enum.
-- Wrap the underlying driver error as a transparent `#[from]` variant; skip a local enum entirely when a module adds nothing over the driver error.
-
-## Keep concurrency semantic
-
-**Intent:** Flow — async marks genuine waiting, so the reader can trust every `await` to mean the world is being waited on.
-
-Use async only at genuine I/O or workflow boundaries. Join tasks when they form one logical operation or truly need concurrent progress. Do not describe concurrency as a performance optimization without evidence.
-
-Keep timeout values explicit and domain-readable. Separate long-running procedures from state-holding service types when that makes both easier to follow.
-
-## Preserve source shape
-
-**Intent:** Uniformity and beauty — sibling modules share one layout, and the vertical rhythm survives rustfmt unchanged.
-
-Keep the representative public API easy to find. Use a consistent order among sibling modules, commonly:
-
-1. imports and selective re-exports;
-2. child module declarations;
-3. constants;
-4. representative public types and implementations;
-5. private helpers and local supporting types;
-6. tests.
-
-Within the types section, lead with the top-level type and let its supporting types follow in the order they are first referenced from above, root to leaf. A model file reads like unrolling one abstraction at a time: the event enum first, then the status enum it embeds, then the result struct, then the per-run struct the result is built from. The reader meets each definition just after the type that needs it — never by scrolling up.
-
-Follow `rustfmt`. Within it, apply the vertical rhythm from `SKILL.md` concretely:
-
-- Pack one-line statements together; give every multi-line `if`, `match`, loop, or chained call a blank line above and below.
-- Put a blank line after a guard-clause return, and before a trailing `Ok(())` or result expression that follows a block.
-- Keep struct fields and enum variants packed with no blank lines, even when each carries a doc comment.
-- Separate `impl` methods with exactly one blank line.
-- In a `mod.rs`, keep imports and re-exports as one packed block, then a blank line, then the `mod` declarations, then the items.
-
-Prefer early returns and flat control flow over deeply nested matches:
-
-- Use `let .. else` for compute-or-bail bindings.
-- Use `if let` for optional side effects and log-and-continue handling.
-- Reserve `match` for exhaustive dispatch: single-line arms for byte and glyph tables, block arms only where an arm needs one.
-- A symmetric validator may end in `if mismatch { Err(...) } else { Ok(()) }` instead of a guard return.
-- Write narrowing numeric conversions with a visible clamp (`value.min(u64::from(u32::MAX)) as u32`), never a bare `as` that can silently truncate.
-
-Write one `use` statement per line, nesting braces only for several items from a single path, sorted alphabetically with `pub use` re-exports interleaved.
+- One packed import block, no blank lines inside, one `use` per line, `pub use` interleaved alphabetically.
+- File order: imports/re-exports → `mod` declarations → constants → representative public types top-down (stepdown rule: each supporting type appears just after the type that references it) → private helpers → tests.
+- Pack single-line statements; one blank line around every multi-line construct; one blank line between `impl` methods; struct fields and enum variants packed even with doc comments.
+- When the formatter would wrap a line awkwardly, restructure the line — extract a named intermediate, split semantic units — instead of accepting the wrap.
+- Keep harmless duplication that preserves symmetry between siblings; abstract only when the abstraction has one honest name and a stable shared rule.
 
 ## Document in Korean, sparsely
 
-**Intent:** Flow — names and structure carry meaning first; documentation appears only where they cannot.
+`///` doc comments in Korean, single declarative sentence ending in 다, technical nouns in English: `/// 진행 event를 중계하고 최종 판정을 뽑는다.`
 
-Write `///` doc comments in Korean, ending in the plain declarative register ("-다"), keeping technical nouns and identifiers in English or backticks: `/// 버튼이 새로 눌린 순간에만 true를 반환한다.`
+- Module `//!` charters state what code cannot show: an invariant, a deliberate absence ("별도 watchdog을 두지 않는다"), a boundary contract, a cancellation-safety guarantee.
+- Document public types, public functions, and fields whose meaning is not carried by name and unit. Leave private helpers bare when name and body suffice.
+- Never document what the next line already says; never leave TODOs, banners, or commented-out code.
+- Route handlers carry one behavior sentence; never restate the method or path that the router and file tree already declare.
 
-- Document public device, service, and model types, their public functions, and model fields whose meaning is not obvious from name and unit.
-- Leave private helpers undocumented when the name and body carry the meaning.
-- Avoid inline `//` comments except provenance notes for ported algorithms (source reference, original formula).
-- Do not add section-divider banners, TODOs, or commented-out code.
+## Tests in Rust
+
+- Boundary tests assert exact edges (`expires_at == now` rejects; the entrance boundary admits).
+- Protocol tests feed adversarial input: oversized payloads split at awkward chunk boundaries, mid-prefix, mid-token.
+- Offline first: fixtures may assemble real clients that never perform I/O (test credentials, `capture_request`-style harnesses, `#[cfg(test)]` stub constructors).
+- Test names state the invariant: `scored_requests_never_return_test_io`, `keeps_an_overlapping_group_alive_after_an_exclusive_failure`.
+- Do not port a test whose subject became structurally guaranteed; note the retirement in the report instead.
 
 ## Verify Rust changes
 
-**Intent:** Proportionality — the cheapest evidence that could disprove the change, within what the hardware allows; stop once the risk is answered.
-
-Run the narrowest applicable commands available in the repository, typically formatting, `cargo check`, focused tests, Clippy, and the relevant build target.
-
-Add unit tests beside pure parsing, checksums, conversions, state transitions, and invariants. Add integration tests at public boundaries when the environment permits. For embedded code, keep platform-independent logic testable without inventing a large hardware abstraction solely for tests.
+Run the narrowest applicable commands: `cargo fmt --check`, `cargo clippy` on the touched crates, focused tests, then the workspace suite when the change crosses crates. Unit tests live beside pure judgments — parsing, scoring, state transitions, validators. State what ran and what requires an environment you do not have.
