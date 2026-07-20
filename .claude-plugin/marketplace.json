@@ -9,7 +9,7 @@
       "name": "insd47",
       "source": "./plugins/insd47",
       "description": "개인 구현 원칙을 적용하는 Build 스킬",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "category": "development"
     }
   ]
