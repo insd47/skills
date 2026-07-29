@@ -50,6 +50,14 @@ Within `Props`:
 - type children with `PropsWithChildren` for children-only wrappers, `ReactNode` for slot-like props, and a specific `ReactElement<XProps>` only when the contract genuinely requires one;
 - use `interface` for props and object shapes; reserve `type` for unions, tuples, and function aliases (`type Status = 'loading' | 'ready' | 'error'`).
 
+## Shape library modules top-down
+
+**Intent:** Flow — a published module reads from public story to supporting detail, exactly like a component file.
+
+Order a library entry module so the package's reason to exist leads: injected or configured constants first; then the principal export (the class or function the package is named for); then subordinate helpers; then options and contract interfaces below the code that uses them — declaration hoisting makes this legal, usage-first makes it readable; type re-exports last.
+
+In signatures, destructure only what the function transforms; reach untouched fields through the named options object (`options.endpoint`) so provenance stays visible at the use site.
+
 ## Build folder-level semantic boundaries
 
 **Intent:** Balance — a feature owns its private views and mechanics; promotion into shared space is an earned event, not a default.
@@ -88,6 +96,12 @@ Do not add return annotations or standalone interfaces merely to restate obvious
 Keep local `Props`, `State`, and `Actions` declarations at the bottom of the file, below everything that uses them. Place a large public domain contract in a dedicated module when it becomes an independent concept.
 
 When types are the module's subject — a domain-model or wire-contract file — order them top-down instead: the root contract leads, and its constituent types follow in the order they are first referenced, root to leaf. Both placements serve the same principle: the file's main story comes first, and supporting detail appears where the reader meets it.
+
+## Type parameters with the ecosystem's contracts
+
+**Intent:** Uniformity — a concept the ecosystem already speaks keeps the ecosystem's vocabulary, so consumer boilerplate transfers verbatim.
+
+When a parameter concept has a de-facto ecosystem contract — AWS credentials, `fetch`, `AbortSignal` — type it with the ecosystem's published types and forward values by spread; declare no parallel local shape. The test: a consumer's existing boilerplate for that concept must transfer verbatim (`credentials: fromNodeProviderChain()`). A type-only ecosystem package is a legitimate runtime dependency when its types appear in the public surface.
 
 ## Compose React instead of abstracting prematurely
 
@@ -166,6 +180,7 @@ Parse, don't validate: consume unknown external data through a schema named `sch
 - Name a local handler identically to the prop it is passed into (`function onLoad()` handed to `onLoad={onLoad}`); use a bare verb (`scrollTo`) when it is not bound to a prop. Do not introduce a parallel `handleX` vocabulary.
 - Inside a component, prefer booleans that read as bare adjectives or participles (`active`, `copied`, `mounted`, `external`), and reserve the `is` prefix for type guards (`isPromiseLike`). This is a soft preference, not a hard rule.
 - Generic parameters are `T` or `T`-prefixed (`TCallback`).
+- `??` is the default spelling of "not provided"; write `||` only when collapsing `''` or `0` is a deliberate, stated decision.
 - Import Node builtins with the `node:` prefix.
 
 ## Preserve readable source shape

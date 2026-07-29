@@ -92,7 +92,14 @@ Choose the narrowest visibility that is true, using boundary shape — not dista
 
 - A client-facing projection may duplicate a storage shape in order to hide fields. Hiding beats reuse across a trust boundary.
 - No silent defaults on trust-boundary requests when the only producer sends complete data — a missing field must fail, not quietly become a default.
+- Absence must remain visible as absence. Optional values model it in the type (`Option`, `undefined`, a disabled feature); values the artifact's contract requires fail the step that ships the artifact. Never a fabricated stand-in — an empty endpoint, a dummy key — that type-checks as real and ships the failure inside a passing pipeline.
 - When two similar paths coexist deliberately, record that intent exactly where a future "fixer" will look.
+
+## Steps declare their inputs
+
+Classify what a pipeline step consumes of each dependency: values (bundling, publish, deploy), types (typechecking), or nothing. A dependency of a kind the step does not consume is structure that bought nothing — a typecheck wrapped in a credentialed shell re-wires the exact dependency the type layer was built to remove.
+
+Commit a generated file only when it is a contract snapshot: a truth the repository does not own (an external spec), or one reviewers gate over time (an OpenAPI dump, an infra type map). Every other derivative gets an explicit generate command and an ignore entry. Wanting to commit a value usually means the injection path has not been found yet.
 
 ## Tests are executable intent
 
