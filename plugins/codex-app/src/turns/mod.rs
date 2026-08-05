@@ -53,7 +53,7 @@ impl Turns {
             .await
             .context("Codex ask task stopped before completion.")??;
 
-        Ok(AskResult::Completed(completion))
+        Ok(AskResult::from(completion))
     }
 
     pub async fn status(&self, reference: TurnReference) -> Result<TurnReference> {

@@ -38,7 +38,7 @@ interrupt(threadId, turnId)
 
 `ask` MCP tool은 Codex turn이 끝날 때까지 block한 뒤 `{threadId, turnId, status, result}`를 최종 tool result로 반환한다. `status`와 `result`는 Desktop follower의 snapshot과 이어지는 patch stream에서 판정한 terminal 상태와 마지막 assistant message다. 2분을 넘긴 호출은 Claude Code 2.1.212 이상에서 자동으로 background 전환되고, turn이 끝나면 task notification으로 같은 tool result가 전달된다. plugin 고유 job ID나 영속 job registry를 만들지 않으며 별도 polling도 필요 없다.
 
-실행 중인 turn이 있을 때 `ask`를 다시 호출하면 같은 persistent 작업을 자동으로 steer하고 `{accepted: "steered", threadId, turnId}`를 즉시 반환한다. 최초의 blocked `ask` 하나만 turn의 completion을 기다린다. `status`, `steer`, `interrupt`는 `ask`가 보고한 Codex `threadId`와 `turnId`를 그대로 사용한다. 별도 상태 목록은 제공하지 않으며 `status`는 해당 turn이 현재 MCP server 세션의 메모리 레지스트리에 있는지만 확인한다. `interrupt`는 non-blocking으로 Codex turn만 정상 중단하고 task는 보존하며, follower가 중단 상태를 보내면 blocked `ask`가 `interrupted`로 끝난다. 서버 재시작 전후로 제어 상태를 이어 붙이지 않는다.
+실행 중인 turn이 있을 때 `ask`를 다시 호출하면 같은 persistent 작업을 자동으로 steer하고 `{status: "steered", threadId, turnId}`를 즉시 반환한다. 최초의 blocked `ask` 하나만 turn의 completion을 기다린다. `status`, `steer`, `interrupt`는 `ask`가 보고한 Codex `threadId`와 `turnId`를 그대로 사용한다. 별도 상태 목록은 제공하지 않으며 `status`는 해당 turn이 현재 MCP server 세션의 메모리 레지스트리에 있는지만 확인한다. `interrupt`는 non-blocking으로 Codex turn만 정상 중단하고 task는 보존하며, follower가 중단 상태를 보내면 blocked `ask`가 `interrupted`로 끝난다. 서버 재시작 전후로 제어 상태를 이어 붙이지 않는다.
 
 `ask`는 현재 ChatGPT Desktop이 소유한 task에 `${CODEX_HOME:-$HOME/.codex}/ipc/ipc.sock`을 통해 turn을 전달하므로 프롬프트와 진행 상황이 Desktop에 바로 표시된다. 시작 전에 Desktop의 task-state follower로 등록하고, 최초 snapshot과 revision이 이어지는 patch stream에서만 진행 및 완료 상태를 판정한다. 사용자의 중단, 플러그인의 중단, 정상 완료가 모두 Desktop이 실제로 표시하는 상태와 같은 출처에서 전달되며 별도 App Server의 디스크 재구성 상태나 무응답 시간은 완료 근거로 사용하지 않는다.
 

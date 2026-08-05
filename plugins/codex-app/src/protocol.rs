@@ -30,36 +30,39 @@ pub struct SteerParams {
     pub prompt: String,
 }
 
-#[derive(Clone, Debug, JsonSchema, Serialize)]
-#[serde(untagged)]
-pub enum AskResult {
-    Completed(Completion),
-    Steered(Steered),
-}
-
+/// blocking `ask`의 단일 반환 형태. MCP outputSchema는 최상위 object를 요구하므로
+/// steer 즉시 반환과 turn 종결을 `status`로 구분하고 union schema를 만들지 않는다.
 #[derive(Clone, Debug, JsonSchema, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[schemars(rename_all = "camelCase")]
-pub struct Steered {
-    pub accepted: Accepted,
+pub struct AskResult {
     pub thread_id: String,
     pub turn_id: String,
-}
-
-#[derive(Clone, Copy, Debug, JsonSchema, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Accepted {
-    Steered,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
 }
 
 impl AskResult {
     /// 실행 중인 turn에 prompt를 전달한 즉시 반환할 결과를 만든다.
     pub fn steered(reference: TurnReference) -> Self {
-        Self::Steered(Steered {
-            accepted: Accepted::Steered,
+        Self {
             thread_id: reference.thread_id,
             turn_id: reference.turn_id,
-        })
+            status: "steered".into(),
+            result: None,
+        }
+    }
+}
+
+impl From<Completion> for AskResult {
+    fn from(completion: Completion) -> Self {
+        Self {
+            thread_id: completion.thread_id,
+            turn_id: completion.turn_id,
+            status: completion.status,
+            result: Some(completion.result),
+        }
     }
 }
 
@@ -96,5 +99,30 @@ impl Completion {
             status: "failed".into(),
             result: error.to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ask_result_schema_stays_a_single_object() {
+        let value = serde_json::to_value(schemars::schema_for!(AskResult)).unwrap();
+        assert_eq!(value["type"], "object");
+    }
+
+    #[test]
+    fn steered_ask_result_omits_the_result_field() {
+        let value = serde_json::to_value(AskResult::steered(TurnReference {
+            thread_id: "thread".into(),
+            turn_id: "turn".into(),
+        }))
+        .unwrap();
+
+        assert_eq!(
+            value,
+            serde_json::json!({"threadId":"thread", "turnId":"turn", "status":"steered"})
+        );
     }
 }

@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn completed_settlement_becomes_the_blocking_ask_result() {
-        let result = AskResult::Completed(Task::completion(
+        let result = AskResult::from(Task::completion(
             reference(),
             "completed".into(),
             "done".into(),
@@ -176,7 +176,7 @@ mod tests {
 
     #[test]
     fn cancelled_settlement_resolves_the_blocking_ask_as_interrupted() {
-        let result = AskResult::Completed(Task::completion(
+        let result = AskResult::from(Task::completion(
             reference(),
             "cancelled".into(),
             "stopped".into(),
