@@ -7,7 +7,7 @@ Codex와 Claude Code가 동일한 스킬 본문을 사용하는 공용 스킬 �
 - [`build`](skills/build/SKILL.md) — 개인 구현 스타일의 핵심 구현 규칙. 언어별 규칙은 실제 작업 언어에 따라 선택적으로 로드한다.
   - [Rust](skills/build/languages/RUST.md)
   - [TypeScript 및 TSX](skills/build/languages/TYPESCRIPT.md)
-- [`codex-app`](skills/codex-app/SKILL.md) — Claude가 계획·비평·조율을, Codex가 구현·조사를 맡는 협업 규칙. 하네스를 판별해 Claude 또는 Codex 가이드 하나만 로드한다. 구현처럼 맥락이 쌓여야 하는 작업은 persistent 스레드로, 조사는 병렬 일회용 워커로 라우팅한다.
+- [`codex`](skills/codex/SKILL.md) — Claude가 계획·비평·조율을, Codex가 구현·조사를 맡는 협업 규칙. 구현은 `codex-app` 플러그인의 `ask` MCP tool로 persistent task에 위임하고, 조사는 `codex` CLI를 background task로 직접 실행한다.
 
 ## Codex 설치
 
@@ -25,7 +25,7 @@ codex plugin marketplace upgrade insd47-skills
 codex plugin add insd47@insd47-skills
 ```
 
-공용 스킬은 `$insd47:build`와 `$insd47:codex-app`이다. 요청과 설명이 일치하면 에이전트가 자동으로 선택할 수도 있다.
+공용 스킬은 `$insd47:build`와 `$insd47:codex`다. 요청과 설명이 일치하면 에이전트가 자동으로 선택할 수도 있다.
 
 ## Claude Code 설치
 
@@ -43,4 +43,4 @@ claude plugin marketplace update insd47-skills
 claude plugin update insd47@insd47-skills
 ```
 
-공용 규칙은 `/insd47:build`와 `/insd47:codex-app`으로 호출한다.
+공용 규칙은 `/insd47:build`와 `/insd47:codex`로 호출한다. `codex` 협업 규칙은 구현 위임에 별도 실행 플러그인(`codex-app`)의 native MCP tools를, 조사 위임에 `codex` CLI를 사용한다.

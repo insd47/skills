@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "codex-app": {
+      "type": "stdio",
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/codex-app",
+      "args": ["server"],
+      "cwd": "${CLAUDE_PROJECT_DIR}",
+      "alwaysLoad": true
+    }
+  }
+}

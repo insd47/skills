@@ -9,14 +9,14 @@
       "name": "insd47",
       "source": "./plugins/insd47",
       "description": "개인 구현 원칙과 Claude-Codex 협업 방식을 제공하는 스킬 모음",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "category": "development"
     },
     {
       "name": "codex-app",
       "source": "./plugins/codex-app",
-      "description": "Codex App 작업을 Claude Code background task로 위임하고 이어서 조율합니다.",
-      "version": "0.1.2",
+      "description": "Codex App 작업을 Claude Code의 native MCP tools로 위임하고 이어서 조율합니다.",
+      "version": "0.2.0",
       "category": "development"
     }
   ]
