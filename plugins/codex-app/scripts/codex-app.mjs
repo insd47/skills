@@ -756,8 +756,7 @@ export async function resolveAskThreadByTitle(appClient, cwd, env = process.env)
     sortKey: "recency_at",
     sortDirection: "desc",
     archived: false,
-    cwd,
-    searchTerm: title
+    cwd
   });
   const matching = (listed.data ?? []).filter(
     (thread) => normalizedTitle(thread.name || thread.preview) === title

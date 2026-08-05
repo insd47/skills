@@ -120,8 +120,7 @@ test("title lookup asks App Server for the current unarchived cwd", async () => 
         sortKey: "recency_at",
         sortDirection: "desc",
         archived: false,
-        cwd: "/work/project",
-        searchTerm: "Claude handoff"
+        cwd: "/work/project"
       }
     }
   ]);
