@@ -18,6 +18,13 @@ const IPC_REQUEST_VERSIONS = new Map([
   ["thread-follower-steer-turn", 1],
   ["thread-follower-interrupt-turn", 4]
 ]);
+const IPC_BROADCAST_VERSIONS = new Map([
+  ["thread-stream-following-changed", 1]
+]);
+const IPC_THREAD_STATE_VERSION = 11;
+const IPC_LOCAL_HOST_ID = "local";
+const IPC_SNAPSHOT_TIMEOUT_MS = 10_000;
+const IPC_PATCH_OPERATIONS = new Set(["add", "replace", "remove"]);
 const ACTIVE_STATUSES = new Set(["queued", "running", "steering", "interrupting"]);
 const TERMINAL_TURN_STATUSES = new Set(["completed", "interrupted", "failed", "cancelled"]);
 const SANDBOXES = new Map([
@@ -284,7 +291,7 @@ class AppServerClient {
       clientInfo: {
         name: "claude_code_codex_app",
         title: "Claude Code Codex App Plugin",
-        version: "0.1.0"
+        version: "0.1.1"
       },
       capabilities: {
         experimentalApi: false,
@@ -435,18 +442,21 @@ class DesktopIpcClient {
     this.socketPath = resolveDesktopIpcPath(env);
     this.clientId = IPC_INITIAL_CLIENT_ID;
     this.pending = new Map();
+    this.broadcastHandlers = new Map();
+    this.failureHandlers = new Set();
     this.buffer = Buffer.alloc(0);
     this.closed = false;
+    this.connectionError = null;
   }
 
   async initialize() {
     validateDesktopIpcPath(this.socketPath, this.env);
     this.socket = net.createConnection(this.socketPath);
     this.socket.on("data", (chunk) => this.handleData(chunk));
-    this.socket.on("error", (error) => this.failPending(error));
+    this.socket.on("error", (error) => this.failConnection(error));
     this.socket.on("close", () => {
       if (!this.closed) {
-        this.failPending(new Error("Codex Desktop IPC connection closed."));
+        this.failConnection(new Error("Codex Desktop IPC connection closed."));
       }
     });
     await new Promise((resolve, reject) => {
@@ -489,6 +499,44 @@ class DesktopIpcClient {
       this.pending.set(requestId, { method, resolve, reject, timer });
       this.send(message);
     });
+  }
+
+  broadcast(method, params = {}, targetClientIds = undefined) {
+    if (!this.socket?.writable) {
+      throw new Error("Codex Desktop IPC is not connected.");
+    }
+    if (this.clientId === IPC_INITIAL_CLIENT_ID) {
+      throw new Error("Codex Desktop IPC is not initialized.");
+    }
+    this.send({
+      type: "broadcast",
+      method,
+      sourceClientId: this.clientId,
+      version: IPC_BROADCAST_VERSIONS.get(method) ?? 0,
+      params,
+      ...(targetClientIds ? { targetClientIds } : {})
+    });
+  }
+
+  addBroadcastHandler(method, handler) {
+    const handlers = this.broadcastHandlers.get(method) ?? new Set();
+    handlers.add(handler);
+    this.broadcastHandlers.set(method, handlers);
+    return () => {
+      handlers.delete(handler);
+      if (handlers.size === 0) {
+        this.broadcastHandlers.delete(method);
+      }
+    };
+  }
+
+  addFailureHandler(handler) {
+    if (this.connectionError) {
+      handler(this.connectionError);
+      return () => {};
+    }
+    this.failureHandlers.add(handler);
+    return () => this.failureHandlers.delete(handler);
   }
 
   send(message) {
@@ -543,6 +591,18 @@ class DesktopIpcClient {
       });
       return;
     }
+    if (message.type === "broadcast") {
+      if (
+        Array.isArray(message.targetClientIds) &&
+        !message.targetClientIds.includes(this.clientId)
+      ) {
+        return;
+      }
+      for (const handler of this.broadcastHandlers.get(message.method) ?? []) {
+        handler(message);
+      }
+      return;
+    }
     if (message.type !== "response") {
       return;
     }
@@ -569,12 +629,26 @@ class DesktopIpcClient {
     this.pending.clear();
   }
 
+  failConnection(error) {
+    if (this.connectionError) {
+      return;
+    }
+    this.connectionError = error;
+    this.failPending(error);
+    for (const handler of this.failureHandlers) {
+      handler(error);
+    }
+    this.failureHandlers.clear();
+  }
+
   async close() {
     if (this.closed) {
       return;
     }
     this.closed = true;
     this.failPending(new Error("Codex Desktop IPC client closed."));
+    this.broadcastHandlers.clear();
+    this.failureHandlers.clear();
     this.socket?.end();
     this.socket?.destroy();
   }
@@ -668,12 +742,7 @@ function normalizedTitle(value) {
   return String(value ?? "").trim().replace(/\s+/g, " ");
 }
 
-async function resolveAskThread(appClient, env = process.env) {
-  const explicitThreadId = String(env.CODEX_APP_THREAD_ID ?? "").trim();
-  if (explicitThreadId) {
-    return explicitThreadId;
-  }
-
+export async function resolveAskThreadByTitle(appClient, cwd, env = process.env) {
   const title = normalizedTitle(env.CODEX_APP_TITLE);
   if (!title) {
     throw new Error(
@@ -687,6 +756,7 @@ async function resolveAskThread(appClient, env = process.env) {
     sortKey: "recency_at",
     sortDirection: "desc",
     archived: false,
+    cwd,
     searchTerm: title
   });
   const matching = (listed.data ?? []).filter(
@@ -700,7 +770,7 @@ async function resolveAskThread(appClient, env = process.env) {
     ? ` Matches: ${matching.slice(0, 5).map(candidateLabel).join(", ")}.`
     : "";
   throw new Error(
-    `CODEX_APP_TITLE did not identify exactly one unarchived Codex task: ${title}.${details} ` +
+    `CODEX_APP_TITLE did not identify exactly one unarchived Codex task in ${cwd}: ${title}.${details} ` +
       "Set CODEX_APP_THREAD_ID to the task id and retry."
   );
 }
@@ -724,44 +794,263 @@ function findTurnId(value) {
   return null;
 }
 
-function latestNewTurn(thread, previousTurnIds, preferredTurnId) {
-  const turns = thread?.turns ?? [];
-  if (preferredTurnId) {
-    const preferred = turns.find((turn) => turn.id === preferredTurnId);
-    if (preferred) {
-      return preferred;
+function assertSafePatchPath(pathSegments) {
+  for (const segment of pathSegments) {
+    if (segment === "__proto__" || segment === "prototype" || segment === "constructor") {
+      throw new Error(`Unsafe Desktop state patch path segment ${segment}.`);
     }
   }
-  return [...turns].reverse().find((turn) => !previousTurnIds.has(turn.id)) ?? null;
 }
 
-async function waitForDesktopTurn(
-  appClient,
-  threadId,
-  previousTurnIds,
-  preferredTurnId,
-  onUpdate
-) {
-  const appearanceDeadline = Date.now() + 30_000;
-  let turnId = preferredTurnId;
-  while (true) {
-    const response = await appClient.request("thread/read", {
-      threadId,
-      includeTurns: true
-    });
-    const turn = latestNewTurn(response.thread, previousTurnIds, turnId);
-    if (turn) {
-      if (!turnId) {
-        turnId = turn.id;
-        onUpdate({ turnId, phase: "running" });
-      }
-      if (TERMINAL_TURN_STATUSES.has(turn.status)) {
-        return { turn, turnId, finalMessage: finalAgentMessage(turn) };
-      }
-    } else if (Date.now() >= appearanceDeadline) {
-      throw new Error("The delegated Codex turn did not appear in the task within 30 seconds.");
+export function applyDesktopStatePatches(state, patches) {
+  let updated = state;
+  for (const patch of patches) {
+    if (!patch || !Array.isArray(patch.path) || !IPC_PATCH_OPERATIONS.has(patch.op)) {
+      throw new Error("Invalid Desktop state patch.");
     }
-    await new Promise((resolve) => setTimeout(resolve, 750));
+    assertSafePatchPath(patch.path);
+    if (patch.path.length === 0) {
+      if (patch.op === "remove") {
+        throw new Error("Desktop state cannot be removed by a root patch.");
+      }
+      updated = patch.value;
+      continue;
+    }
+
+    let parent = updated;
+    for (const segment of patch.path.slice(0, -1)) {
+      if (parent == null || typeof parent !== "object") {
+        throw new Error("Desktop state patch traversed a non-container value.");
+      }
+      if (!Object.prototype.hasOwnProperty.call(parent, segment)) {
+        throw new Error(`Desktop state patch path is missing ${String(segment)}.`);
+      }
+      parent = parent[segment];
+    }
+
+    const key = patch.path.at(-1);
+    if (Array.isArray(parent)) {
+      if (!Number.isInteger(key)) {
+        throw new Error("Desktop state array patch requires an integer index.");
+      }
+      if (patch.op === "add") {
+        if (key < 0 || key > parent.length) {
+          throw new Error("Desktop state array add index is out of bounds.");
+        }
+        parent.splice(key, 0, patch.value);
+      } else {
+        if (key < 0 || key >= parent.length) {
+          throw new Error("Desktop state array patch index is out of bounds.");
+        }
+        if (patch.op === "remove") {
+          parent.splice(key, 1);
+        } else {
+          parent[key] = patch.value;
+        }
+      }
+      continue;
+    }
+    if (parent == null || typeof parent !== "object") {
+      throw new Error("Desktop state patch parent is not an object.");
+    }
+    if (patch.op === "remove") {
+      delete parent[key];
+    } else {
+      parent[key] = patch.value;
+    }
+  }
+  return updated;
+}
+
+export function desktopTurnById(conversationState, turnId) {
+  const entities = conversationState?.turnHistory?.history?.entitiesByKey;
+  if (entities && typeof entities === "object") {
+    const canonical = Object.values(entities).find((turn) => turn?.turnId === turnId);
+    if (canonical) {
+      return canonical;
+    }
+  }
+  return (conversationState?.turns ?? []).find(
+    (turn) => turn?.turnId === turnId || turn?.id === turnId
+  ) ?? null;
+}
+
+export class DesktopThreadFollower {
+  constructor(ipcClient, threadId, options = {}) {
+    this.ipcClient = ipcClient;
+    this.threadId = threadId;
+    this.hostId = options.hostId ?? IPC_LOCAL_HOST_ID;
+    this.snapshotTimeoutMs = options.snapshotTimeoutMs ?? IPC_SNAPSHOT_TIMEOUT_MS;
+    this.state = null;
+    this.revision = null;
+    this.ownerClientId = null;
+    this.started = false;
+    this.closed = false;
+    this.error = null;
+    this.turnWaiter = null;
+  }
+
+  async start() {
+    if (this.started) {
+      throw new Error("Codex Desktop task follower is already started.");
+    }
+    this.started = true;
+    this.removeBroadcastHandler = this.ipcClient.addBroadcastHandler(
+      "thread-stream-state-changed",
+      (message) => this.handleStateChanged(message)
+    );
+    this.removeFailureHandler = this.ipcClient.addFailureHandler((error) => this.fail(error));
+
+    await new Promise((resolve, reject) => {
+      this.readyWaiter = { resolve, reject };
+      this.requestSnapshot();
+    });
+  }
+
+  requestSnapshot() {
+    if (this.closed || this.error) {
+      return;
+    }
+    clearTimeout(this.snapshotTimer);
+    this.awaitingSnapshot = true;
+    this.snapshotTimer = setTimeout(() => {
+      this.fail(
+        new Error(
+          `Codex Desktop did not expose task ${this.threadId} as an owned IPC stream within ${this.snapshotTimeoutMs}ms.`
+        )
+      );
+    }, this.snapshotTimeoutMs);
+    try {
+      this.ipcClient.broadcast("thread-stream-following-changed", {
+        conversationId: this.threadId,
+        hostId: this.hostId,
+        following: true
+      });
+    } catch (error) {
+      this.fail(error);
+    }
+  }
+
+  handleStateChanged(message) {
+    try {
+      const params = message.params;
+      if (params?.conversationId !== this.threadId || params?.hostId !== this.hostId) {
+        return;
+      }
+      if (message.version !== IPC_THREAD_STATE_VERSION) {
+        throw new Error(
+          `Unsupported Codex Desktop thread state protocol version ${String(message.version)}; expected ${IPC_THREAD_STATE_VERSION}.`
+        );
+      }
+      const change = params.change;
+      if (change?.type === "snapshot") {
+        if (
+          !change.conversationState ||
+          typeof change.conversationState !== "object" ||
+          !Number.isInteger(change.revision)
+        ) {
+          throw new Error("Codex Desktop sent an invalid task state snapshot.");
+        }
+        this.state = change.conversationState;
+        this.revision = change.revision;
+        this.ownerClientId = message.sourceClientId;
+        this.awaitingSnapshot = false;
+        clearTimeout(this.snapshotTimer);
+        this.readyWaiter?.resolve();
+        this.readyWaiter = null;
+        this.settleTurnIfFinished();
+        return;
+      }
+      if (change?.type !== "patches") {
+        throw new Error(`Unsupported Codex Desktop task state change ${String(change?.type)}.`);
+      }
+      if (this.awaitingSnapshot) {
+        return;
+      }
+      if (
+        message.sourceClientId !== this.ownerClientId ||
+        change.baseRevision !== this.revision ||
+        !Number.isInteger(change.revision) ||
+        change.revision <= change.baseRevision
+      ) {
+        this.requestSnapshot();
+        return;
+      }
+      this.state = applyDesktopStatePatches(this.state, change.patches);
+      this.revision = change.revision;
+      this.settleTurnIfFinished();
+    } catch (error) {
+      this.fail(error);
+    }
+  }
+
+  waitForTurn(turnId) {
+    if (!this.started || !this.state) {
+      return Promise.reject(new Error("Codex Desktop task follower is not ready."));
+    }
+    if (this.error) {
+      return Promise.reject(this.error);
+    }
+    if (this.turnWaiter) {
+      return Promise.reject(new Error("Codex Desktop task follower is already waiting for a turn."));
+    }
+    const turn = desktopTurnById(this.state, turnId);
+    if (turn && TERMINAL_TURN_STATUSES.has(turn.status)) {
+      return Promise.resolve({ turn, turnId, finalMessage: finalAgentMessage(turn) });
+    }
+    return new Promise((resolve, reject) => {
+      this.turnWaiter = { turnId, resolve, reject };
+    });
+  }
+
+  settleTurnIfFinished() {
+    if (!this.turnWaiter) {
+      return;
+    }
+    const turn = desktopTurnById(this.state, this.turnWaiter.turnId);
+    if (!turn || !TERMINAL_TURN_STATUSES.has(turn.status)) {
+      return;
+    }
+    const waiter = this.turnWaiter;
+    this.turnWaiter = null;
+    waiter.resolve({
+      turn,
+      turnId: waiter.turnId,
+      finalMessage: finalAgentMessage(turn)
+    });
+  }
+
+  fail(error) {
+    if (this.error || this.closed) {
+      return;
+    }
+    this.error = error instanceof Error ? error : new Error(String(error));
+    clearTimeout(this.snapshotTimer);
+    this.readyWaiter?.reject(this.error);
+    this.readyWaiter = null;
+    this.turnWaiter?.reject(this.error);
+    this.turnWaiter = null;
+  }
+
+  async close() {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
+    clearTimeout(this.snapshotTimer);
+    try {
+      this.ipcClient.broadcast("thread-stream-following-changed", {
+        conversationId: this.threadId,
+        hostId: this.hostId,
+        following: false
+      });
+    } catch {
+      // A disconnected IPC client is already absent from Desktop's follower set.
+    }
+    this.removeBroadcastHandler?.();
+    this.removeFailureHandler?.();
+    this.turnWaiter?.reject(new Error("Codex Desktop task follower closed before completion."));
+    this.turnWaiter = null;
   }
 }
 
@@ -881,6 +1170,7 @@ async function executeAskWorker(prompt, env = process.env) {
   const cwd = workspaceRoot();
   let appClient = null;
   let ipcClient = null;
+  let threadFollower = null;
   let controlServer = null;
   let socketPath = null;
   let jobId = null;
@@ -889,10 +1179,14 @@ async function executeAskWorker(prompt, env = process.env) {
   let update = () => null;
 
   try {
-    appClient = new AppServerClient(cwd, env);
-    ipcClient = new DesktopIpcClient(env);
-    await Promise.all([appClient.initialize(), ipcClient.initialize()]);
-    threadId = await resolveAskThread(appClient, env);
+    threadId = String(env.CODEX_APP_THREAD_ID ?? "").trim();
+    if (!threadId) {
+      appClient = new AppServerClient(cwd, env);
+      await appClient.initialize();
+      threadId = await resolveAskThreadByTitle(appClient, cwd, env);
+      await appClient.close();
+      appClient = null;
+    }
 
     const existing = await steerExistingAsk(cwd, threadId, prompt, env);
     if (existing) {
@@ -902,6 +1196,8 @@ async function executeAskWorker(prompt, env = process.env) {
       return;
     }
 
+    ipcClient = new DesktopIpcClient(env);
+    await ipcClient.initialize();
     jobId = newJobId();
     socketPath = controlSocketPath(jobId, env);
     const job = {
@@ -927,13 +1223,10 @@ async function executeAskWorker(prompt, env = process.env) {
     };
     writeJob(cwd, job, env);
     update = (patch) => patchJob(cwd, jobId, patch, env);
-    update({ status: "running", startedAt: now(), binary: appClient.binary });
+    update({ status: "running", startedAt: now(), transport: "desktop-ipc" });
 
-    const before = await appClient.request("thread/read", {
-      threadId,
-      includeTurns: true
-    });
-    const previousTurnIds = new Set((before.thread?.turns ?? []).map((turn) => turn.id));
+    threadFollower = new DesktopThreadFollower(ipcClient, threadId);
+    await threadFollower.start();
 
     controlServer = await openControlServer(socketPath, async (request) => {
       if (!activeTurnId) {
@@ -982,20 +1275,12 @@ async function executeAskWorker(prompt, env = process.env) {
       update({ turnId: activeTurnId, phase: "running" });
     }
 
-    const result = await waitForDesktopTurn(
-      appClient,
-      threadId,
-      previousTurnIds,
-      activeTurnId,
-      (patch) => {
-        if (patch.turnId) {
-          activeTurnId = patch.turnId;
-        }
-        update(patch);
-      }
-    );
+    if (!activeTurnId) {
+      throw new Error("Codex Desktop did not return a turn id.");
+    }
+    const result = await threadFollower.waitForTurn(activeTurnId);
     activeTurnId = result.turnId;
-    const status = result.turn.status === "completed" ? "completed" : result.turn.status;
+    const status = result.turn.status === "cancelled" ? "interrupted" : result.turn.status;
     update({
       status,
       phase: "done",
@@ -1032,6 +1317,7 @@ async function executeAskWorker(prompt, env = process.env) {
   } finally {
     await closeControlServer(controlServer, socketPath);
     await Promise.all([
+      threadFollower?.close().catch(() => {}),
       appClient?.close().catch(() => {}),
       ipcClient?.close().catch(() => {})
     ]);

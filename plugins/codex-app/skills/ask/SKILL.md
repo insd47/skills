@@ -23,6 +23,6 @@ The Bash tool must own backgrounding. Do not append `&`, detach the Node process
 
 If the associated Codex thread already has an active plugin job, the command steers that turn and exits; the original background task remains responsible for the final completion event. Otherwise the command remains alive until Codex completes, then its final stdout wakes this Claude loop.
 
-The command selects exactly one unarchived task whose title matches `CODEX_APP_TITLE`. If that variable is absent or the title is ambiguous, report the error and ask the user for `CODEX_APP_THREAD_ID`; never infer from the cwd, message history, or handoff wording, and never replace the dispatch with a separate Codex task.
+The command selects exactly one unarchived task whose cwd matches the current working directory and whose title matches `CODEX_APP_TITLE`. If that variable is absent or the title is ambiguous within the current working directory, report the error and ask the user for `CODEX_APP_THREAD_ID`; never infer from message history or handoff wording, and never replace the dispatch with a separate Codex task. An explicit `CODEX_APP_THREAD_ID` remains global and bypasses title and cwd lookup.
 
 After dispatch, continue useful planning or tell the user that Codex is running. When completion arrives, evaluate Codex's output and choose the next loop action. Do not substitute Claude-side implementation if dispatch fails.

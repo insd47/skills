@@ -34,10 +34,12 @@ claude plugin update codex-app@insd47-skills
 
 `ask`를 다시 호출하면 같은 persistent 작업의 실행 중인 turn을 자동으로 steer한다. 병렬 `run` 작업은 job ID와 함께 `steer`를 사용한다. `interrupt`는 Codex turn만 정상 중단하고 task는 보존한다. 강제 프로세스 종료와 별도 result 조회는 제공하지 않는다. background task 완료가 결과 전달과 루프 재개를 모두 담당한다.
 
-`ask`는 현재 Codex Desktop이 소유한 task에 `${CODEX_HOME:-$HOME/.codex}/ipc/ipc.sock`을 통해 turn을 전달하므로 프롬프트와 진행 상황이 Desktop에 바로 표시된다. Codex Desktop은 내장 터미널을 만들 때 대화 제목을 `CODEX_APP_TITLE`로 전달하며, 플러그인은 이 제목과 정확히 일치하는 비아카이브 task가 하나일 때만 자동 선택한다. 제목이 없거나 일치 결과가 모호하면 조회 조건을 추측하지 않고 task ID를 요구한다. 명시적으로 고정하려면 Claude를 시작할 때 `CODEX_APP_THREAD_ID=<id>`를 설정한다.
+`ask`는 현재 Codex Desktop이 소유한 task에 `${CODEX_HOME:-$HOME/.codex}/ipc/ipc.sock`을 통해 turn을 전달하므로 프롬프트와 진행 상황이 Desktop에 바로 표시된다. 시작 전에 Desktop의 task-state follower로 등록하고, 최초 snapshot과 revision이 이어지는 patch stream에서만 진행 및 완료 상태를 판정한다. 사용자의 중단, 플러그인의 중단, 정상 완료가 모두 Desktop이 실제로 표시하는 상태와 같은 출처에서 전달되며 별도 App Server의 디스크 재구성 상태나 무응답 시간은 완료 근거로 사용하지 않는다.
+
+Codex Desktop은 내장 터미널을 만들 때 대화 제목을 `CODEX_APP_TITLE`로 전달하며, 플러그인은 현재 작업 디렉터리와 정확히 일치하는 비아카이브 task 중에서 제목까지 정확히 일치하는 항목이 하나일 때만 자동 선택한다. App Server의 `thread/list`에 `cwd`와 `archived: false`를 함께 전달하므로 다른 프로젝트의 동명 task는 후보로 로드되지 않는다. 이 제목 조회에만 짧게 실행한 App Server를 사용하고 task를 찾은 즉시 닫는다. 이후 turn 시작, steer, interrupt, 상태 stream, 최종 메시지는 모두 Desktop IPC를 사용한다. 제목이 없거나 현재 작업 디렉터리 안에서도 일치 결과가 모호하면 task ID를 요구한다. 명시적으로 고정하려면 Claude를 시작할 때 `CODEX_APP_THREAD_ID=<id>`를 설정하며, 이 방식은 프로젝트 경로와 아카이브 여부에 관계없이 전역으로 해당 ID를 사용한다.
 
 Codex나 Claude는 이미 실행 중인 사람용 내장 터미널 프로세스에 환경 변수를 사후 주입할 수 없다. `CODEX_APP_TITLE`은 터미널 생성 시점의 스냅샷이므로 task 제목을 바꾼 뒤에는 터미널을 다시 열거나 `CODEX_APP_THREAD_ID`를 사용한다.
 
-Desktop IPC는 현재 앱이 창간 task coordination에 사용하는 비공개 프로토콜이다. 플러그인은 앱과 동일한 길이 프레이밍 및 요청 버전을 사용하고, socket 소유권과 디렉터리 권한을 검사한다. 앱 업데이트로 프로토콜이 달라지면 별도 App Server task로 조용히 우회하지 않고 오류를 반환한다. `CODEX_APP_IPC_PATH`로 endpoint를 명시할 수 있지만 일반 설치에서는 canonical 경로를 그대로 사용한다.
+Desktop IPC는 현재 앱이 창간 task coordination에 사용하는 비공개 프로토콜이다. 플러그인은 앱과 동일한 길이 프레이밍, follower broadcast, snapshot revision 및 patch 규칙을 사용하고, socket 소유권과 디렉터리 권한을 검사한다. patch revision이 끊기면 IPC에서 새 snapshot을 요청한다. 앱 업데이트로 프로토콜 버전이나 상태 형식이 달라지면 별도 App Server task나 rollout polling으로 조용히 우회하지 않고 오류를 반환한다. `CODEX_APP_IPC_PATH`로 endpoint를 명시할 수 있지만 일반 설치에서는 canonical 경로를 그대로 사용한다.
 
 `run`은 Desktop 실시간 연동을 사용하지 않는다. `CODEX_APP_BIN`, `CODEX_CLI_PATH`, `PATH` 순서로 Codex CLI를 찾아 독립 App Server task를 만들고, 결과를 전달한 뒤 자동 아카이브한다. 앱 번들 내부의 절대 경로에는 의존하지 않는다.
