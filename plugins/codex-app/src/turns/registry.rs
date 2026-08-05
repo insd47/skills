@@ -37,11 +37,29 @@ pub struct Handle {
 }
 
 impl Registry {
-    /// thread에 활성 entry가 있으면 turn 일치 여부와 무관하게 손잡이를 돌려준다.
-    pub async fn find(&self, thread_id: &str) -> Option<Handle> {
-        self.active.lock().await.get(thread_id).map(|entry| Handle {
-            commands: entry.commands.clone(),
-        })
+    /// 비어 있는 thread를 차지하고, 이미 활성 entry가 있으면 그 손잡이를 돌려준다.
+    pub async fn claim(
+        &self,
+        thread_id: &str,
+        commands: &mpsc::UnboundedSender<Command>,
+    ) -> Option<Handle> {
+        let mut active = self.active.lock().await;
+
+        if let Some(entry) = active.get(thread_id) {
+            return Some(Handle {
+                commands: entry.commands.clone(),
+            });
+        }
+
+        active.insert(
+            thread_id.to_owned(),
+            Entry {
+                turn_id: None,
+                commands: commands.clone(),
+            },
+        );
+
+        None
     }
 
     /// reference와 정확히 일치하는 활성 turn의 손잡이를 돌려주고, 아니면 오류를 낸다.
@@ -58,21 +76,6 @@ impl Registry {
                 reference.thread_id
             ),
         }
-    }
-
-    pub async fn register(
-        &self,
-        thread_id: &str,
-        commands: &mpsc::UnboundedSender<Command>,
-        turn_id: Option<String>,
-    ) {
-        self.active.lock().await.insert(
-            thread_id.to_owned(),
-            Entry {
-                turn_id,
-                commands: commands.clone(),
-            },
-        );
     }
 
     /// 같은 task의 entry일 때만 현재 turn을 갱신한다.
@@ -132,5 +135,20 @@ impl Handle {
         result
             .await
             .context("Codex turn stopped before interrupt completed.")?
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn only_the_first_claim_owns_a_thread() {
+        let registry = Registry::default();
+        let (first, _first_receiver) = mpsc::unbounded_channel();
+        let (second, _second_receiver) = mpsc::unbounded_channel();
+
+        assert!(registry.claim("thread", &first).await.is_none());
+        assert!(registry.claim("thread", &second).await.is_some());
     }
 }

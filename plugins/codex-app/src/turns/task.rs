@@ -1,46 +1,40 @@
 //! persistent Desktop task의 turn 하나를 소유한다. 완료 판정은 Desktop follower stream만 사용한다.
 
 use crate::client::{Client, Follower};
-use crate::outbox::Outbox;
 use crate::protocol::{Completion, TurnReference};
 use crate::turns::registry::{Command, Registry};
 use anyhow::{Result, anyhow};
 use std::path::PathBuf;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 
 pub struct Task {
     pub cwd: PathBuf,
-    pub outbox: Outbox,
     pub registry: Registry,
     pub thread_id: String,
     pub prompt: String,
     pub commands: mpsc::UnboundedSender<Command>,
     pub receiver: mpsc::UnboundedReceiver<Command>,
-    pub started: Option<oneshot::Sender<Result<TurnReference>>>,
 }
 
 impl Task {
-    pub async fn run(mut self) {
+    pub async fn run(mut self) -> Result<Completion> {
         let mut reference = None;
+        let result = self.try_run(&mut reference).await;
 
-        if let Err(error) = self.try_run(&mut reference).await {
-            if let Some(sender) = self.started.take() {
-                let _ = sender.send(Err(anyhow!("{error:#}")));
-            }
-
-            if let Some(reference) = &reference
-                && let Err(e) = self.outbox.write(&Completion::failed(reference, &error))
-            {
-                tracing::error!(error = format!("{e:#}"), "Failed to write completion");
-            }
-
+        let result = result.or_else(|error| {
             tracing::error!(error = format!("{error:#}"), "Codex ask task failed");
-        }
+
+            reference
+                .as_ref()
+                .map(|reference| Completion::failed(reference, &error))
+                .ok_or_else(|| anyhow!("{error:#}"))
+        });
 
         self.registry.remove(&self.thread_id, &self.commands).await;
+        result
     }
 
-    async fn try_run(&mut self, reference: &mut Option<TurnReference>) -> Result<()> {
+    async fn try_run(&mut self, reference: &mut Option<TurnReference>) -> Result<Completion> {
         let mut client = Client::connect().await?;
         let mut follower = Follower::start(&mut client, self.thread_id.clone()).await?;
 
@@ -55,7 +49,7 @@ impl Task {
         client: &mut Client,
         follower: &mut Follower,
         reference: &mut Option<TurnReference>,
-    ) -> Result<()> {
+    ) -> Result<Completion> {
         let mut turn_id = client
             .start(&self.thread_id, &self.prompt, &self.cwd)
             .await?;
@@ -71,22 +65,13 @@ impl Task {
             .set_turn(&self.thread_id, &self.commands, turn_id.clone())
             .await;
 
-        if let Some(sender) = self.started.take() {
-            let _ = sender.send(Ok(current.clone()));
-        }
-
         loop {
             if let Some(settlement) = follower.settlement(&turn_id) {
-                let status = if settlement.status == "cancelled" {
-                    "interrupted"
-                } else {
-                    &settlement.status
-                };
-
-                self.outbox
-                    .write(&Completion::settled(current, status, settlement.result))?;
-
-                return Ok(());
+                return Ok(Self::completion(
+                    current,
+                    settlement.status,
+                    settlement.result,
+                ));
             }
 
             tokio::select! {
@@ -148,5 +133,61 @@ impl Task {
                 Ok(turn_id.to_owned())
             }
         }
+    }
+
+    fn completion(reference: TurnReference, status: String, result: String) -> Completion {
+        let status = if status == "cancelled" {
+            "interrupted"
+        } else {
+            &status
+        };
+
+        Completion::settled(reference, status, result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::AskResult;
+
+    fn reference() -> TurnReference {
+        TurnReference {
+            thread_id: "thread".into(),
+            turn_id: "turn".into(),
+        }
+    }
+
+    #[test]
+    fn completed_settlement_becomes_the_blocking_ask_result() {
+        let result = AskResult::Completed(Task::completion(
+            reference(),
+            "completed".into(),
+            "done".into(),
+        ));
+
+        assert_eq!(
+            serde_json::to_value(result).unwrap(),
+            serde_json::json!({
+                "threadId":"thread", "turnId":"turn", "status":"completed", "result":"done"
+            })
+        );
+    }
+
+    #[test]
+    fn cancelled_settlement_resolves_the_blocking_ask_as_interrupted() {
+        let result = AskResult::Completed(Task::completion(
+            reference(),
+            "cancelled".into(),
+            "stopped".into(),
+        ));
+
+        assert_eq!(
+            serde_json::to_value(result).unwrap(),
+            serde_json::json!({
+                "threadId":"thread", "turnId":"turn", "status":"interrupted",
+                "result":"stopped"
+            })
+        );
     }
 }

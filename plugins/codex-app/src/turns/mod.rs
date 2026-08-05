@@ -4,74 +4,56 @@ mod registry;
 mod task;
 
 use crate::client::lookup;
-use crate::outbox::Outbox;
-use crate::protocol::{Accepted, Started, SteerParams, TurnKind, TurnReference};
+use crate::protocol::{AskResult, SteerParams, TurnReference};
 use crate::validate::{required, target_thread};
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result};
 use registry::Registry;
 use std::env;
 use std::path::PathBuf;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 
 #[derive(Clone)]
 pub struct Turns {
     cwd: PathBuf,
-    outbox: Outbox,
     registry: Registry,
 }
 
 impl Turns {
-    pub fn new(cwd: PathBuf, outbox: Outbox) -> Self {
+    pub fn new(cwd: PathBuf) -> Self {
         Self {
             cwd,
-            outbox,
             registry: Registry::default(),
         }
     }
 
-    pub async fn ask(&self, prompt: String) -> Result<Started> {
+    pub async fn ask(&self, prompt: String) -> Result<AskResult> {
         let prompt = required(prompt, "prompt")?;
         let thread_id = self.resolve_ask_thread().await?;
+        let (commands, receiver) = mpsc::unbounded_channel();
 
-        if let Some(handle) = self.registry.find(&thread_id).await {
+        if let Some(handle) = self.registry.claim(&thread_id, &commands).await {
             let reference = handle.steer(None, prompt).await?;
 
-            return Ok(Started {
-                thread_id: reference.thread_id,
-                turn_id: reference.turn_id,
-                kind: TurnKind::Ask,
-                accepted: Accepted::Steered,
-            });
+            return Ok(AskResult::steered(reference));
         }
 
-        let (commands, receiver) = mpsc::unbounded_channel();
-        let (started_tx, started_rx) = oneshot::channel();
-        self.registry.register(&thread_id, &commands, None).await;
-
-        tokio::spawn(
+        let task = tokio::spawn(
             task::Task {
                 cwd: self.cwd.clone(),
-                outbox: self.outbox.clone(),
                 registry: self.registry.clone(),
                 thread_id,
                 prompt,
                 commands,
                 receiver,
-                started: Some(started_tx),
             }
             .run(),
         );
 
-        let reference = started_rx
+        let completion = task
             .await
-            .map_err(|_| anyhow!("Codex ask task stopped before dispatch."))??;
+            .context("Codex ask task stopped before completion.")??;
 
-        Ok(Started {
-            thread_id: reference.thread_id,
-            turn_id: reference.turn_id,
-            kind: TurnKind::Ask,
-            accepted: Accepted::Started,
-        })
+        Ok(AskResult::Completed(completion))
     }
 
     pub async fn status(&self, reference: TurnReference) -> Result<TurnReference> {

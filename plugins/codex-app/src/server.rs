@@ -1,5 +1,4 @@
-use crate::outbox::Outbox;
-use crate::protocol::{AskParams, Started, SteerParams, TurnReference};
+use crate::protocol::{AskParams, AskResult, SteerParams, TurnReference};
 use crate::turns::Turns;
 use anyhow::Result;
 use rmcp::handler::server::router::tool::ToolRouter;
@@ -8,7 +7,7 @@ use rmcp::model::{Implementation, ServerCapabilities, ServerInfo};
 use rmcp::{Json, ServerHandler, ServiceExt, tool, tool_handler, tool_router};
 use std::path::PathBuf;
 
-const INSTRUCTIONS: &str = "Use ask for implementation and follow-up work in the persistent Codex App task. Use the codex CLI directly for parallel or disposable research; the insd47:codex skill guides that workflow. Pass the threadId and turnId returned by ask to status, steer, or interrupt. ask returns after dispatch; completion arrives through the Codex App monitor. Calling ask again steers the active persistent turn automatically.";
+const INSTRUCTIONS: &str = "Use ask for implementation and follow-up work in the persistent Codex App task. ask blocks until the turn completes and returns the final result. Claude Code 2.1.212+ automatically backgrounds MCP calls that run longer than 2 minutes and delivers completion through a task notification. Calling ask during an active turn steers it and returns immediately. Pass the threadId and turnId reported by ask to status, steer, or interrupt. Use the codex CLI directly for parallel or disposable research; the insd47:codex skill guides that workflow.";
 
 #[derive(Clone)]
 pub struct Server {
@@ -18,16 +17,16 @@ pub struct Server {
 
 #[tool_router(router = tool_router)]
 impl Server {
-    pub fn new(cwd: PathBuf, outbox: Outbox) -> Self {
+    pub fn new(cwd: PathBuf) -> Self {
         Self {
-            turns: Turns::new(cwd, outbox),
+            turns: Turns::new(cwd),
             tool_router: Self::tool_router(),
         }
     }
 
     #[tool(
         name = "ask",
-        description = "Send a prompt to the visible persistent Codex App task. A repeated call steers its active turn.",
+        description = "Send a prompt to the visible persistent Codex App task and wait for its final result. A repeated call steers its active turn and returns immediately.",
         annotations(
             title = "Ask Codex App",
             destructive_hint = true,
@@ -38,7 +37,7 @@ impl Server {
     async fn ask(
         &self,
         Parameters(params): Parameters<AskParams>,
-    ) -> Result<Json<Started>, String> {
+    ) -> Result<Json<AskResult>, String> {
         self.turns
             .ask(params.prompt)
             .await
@@ -137,7 +136,7 @@ mod tests {
     #[test]
     fn server_exposes_only_the_four_persistent_tools() {
         let root = std::env::temp_dir().join(format!("codex-app-server-{}", uuid::Uuid::new_v4()));
-        let server = Server::new(root.clone(), Outbox::new(&root, &root));
+        let server = Server::new(root);
         let mut names = server
             .tool_router
             .list_all()

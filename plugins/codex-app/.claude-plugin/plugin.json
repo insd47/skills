@@ -1,14 +1,11 @@
 {
   "name": "codex-app",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Codex App 작업을 Claude Code의 native MCP tools로 위임하고 이어서 조율합니다.",
   "author": {
     "name": "황인성"
   },
   "homepage": "https://github.com/insd47/skills",
   "repository": "https://github.com/insd47/skills",
-  "mcpServers": "./.mcp.json",
-  "experimental": {
-    "monitors": "./monitors/monitors.json"
-  }
+  "mcpServers": "./.mcp.json"
 }

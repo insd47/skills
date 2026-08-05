@@ -1,7 +1,0 @@
-[
-  {
-    "name": "codex-app-turns",
-    "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/codex-app\" monitor",
-    "description": "Codex App turns"
-  }
-]

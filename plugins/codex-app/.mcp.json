@@ -5,7 +5,8 @@
       "command": "${CLAUDE_PLUGIN_ROOT}/bin/codex-app",
       "args": ["server"],
       "cwd": "${CLAUDE_PROJECT_DIR}",
-      "alwaysLoad": true
+      "alwaysLoad": true,
+      "timeout": 3600000
     }
   }
 }

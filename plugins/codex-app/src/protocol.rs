@@ -31,45 +31,54 @@ pub struct SteerParams {
 }
 
 #[derive(Clone, Debug, JsonSchema, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[schemars(rename_all = "camelCase")]
-pub struct Started {
-    pub thread_id: String,
-    pub turn_id: String,
-    pub kind: TurnKind,
-    pub accepted: Accepted,
+#[serde(untagged)]
+pub enum AskResult {
+    Completed(Completion),
+    Steered(Steered),
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, JsonSchema, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum TurnKind {
-    Ask,
+#[derive(Clone, Debug, JsonSchema, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename_all = "camelCase")]
+pub struct Steered {
+    pub accepted: Accepted,
+    pub thread_id: String,
+    pub turn_id: String,
 }
 
 #[derive(Clone, Copy, Debug, JsonSchema, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Accepted {
-    Started,
     Steered,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+impl AskResult {
+    /// 실행 중인 turn에 prompt를 전달한 즉시 반환할 결과를 만든다.
+    pub fn steered(reference: TurnReference) -> Self {
+        Self::Steered(Steered {
+            accepted: Accepted::Steered,
+            thread_id: reference.thread_id,
+            turn_id: reference.turn_id,
+        })
+    }
+}
+
+#[derive(Clone, Debug, JsonSchema, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[schemars(rename_all = "camelCase")]
 pub struct Completion {
     pub thread_id: String,
     pub turn_id: String,
-    pub kind: TurnKind,
     pub status: String,
     pub result: String,
 }
 
 impl Completion {
-    /// 종결된 turn의 완료 기록을 만든다. 빈 결과는 안내 문구로 대체한다.
+    /// 종결된 turn의 반환 결과를 만든다. 빈 결과는 안내 문구로 대체한다.
     pub fn settled(reference: TurnReference, status: impl Into<String>, result: String) -> Self {
         Self {
             thread_id: reference.thread_id,
             turn_id: reference.turn_id,
-            kind: TurnKind::Ask,
             status: status.into(),
             result: if result.is_empty() {
                 "Codex completed without a final agent message.".into()
@@ -79,12 +88,11 @@ impl Completion {
         }
     }
 
-    /// 실패한 turn의 외부 완료 기록을 만든다.
+    /// 실패한 turn의 반환 결과를 만든다.
     pub fn failed(reference: &TurnReference, error: &Error) -> Self {
         Self {
             thread_id: reference.thread_id.clone(),
             turn_id: reference.turn_id.clone(),
-            kind: TurnKind::Ask,
             status: "failed".into(),
             result: error.to_string(),
         }

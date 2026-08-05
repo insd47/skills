@@ -1,6 +1,6 @@
 [package]
 name = "codex-app"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2024"
 
 [dependencies]
@@ -11,7 +11,6 @@ rustix = { version = "1.1", features = ["process"] }
 schemars = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-sha2 = "0.10"
 tokio = { version = "1.53", features = ["io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
