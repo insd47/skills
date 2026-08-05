@@ -16,7 +16,7 @@
       "name": "codex-app",
       "source": "./plugins/codex-app",
       "description": "Codex App 작업을 Claude Code의 native MCP tools로 위임하고 이어서 조율합니다.",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "category": "development"
     }
   ]

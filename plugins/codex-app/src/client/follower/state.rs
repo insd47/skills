@@ -73,7 +73,8 @@ pub enum StateChange {
 pub struct DesktopPatch {
     pub op: PatchOperation,
     pub path: Vec<PathSegment>,
-    pub value: Option<Value>,
+    #[serde(default)]
+    pub value: Value,
 }
 
 #[derive(Debug, Deserialize)]

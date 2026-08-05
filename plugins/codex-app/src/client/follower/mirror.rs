@@ -116,14 +116,10 @@ impl Mirror {
             .map(|patch| -> Result<Value> {
                 let path = Self::pointer(&patch.path);
                 Ok(match patch.op {
-                    PatchOperation::Add => json!({
-                        "op":"add", "path":path,
-                        "value":patch.value.context("Desktop add patch has no value.")?
-                    }),
-                    PatchOperation::Replace => json!({
-                        "op":"replace", "path":path,
-                        "value":patch.value.context("Desktop replace patch has no value.")?
-                    }),
+                    PatchOperation::Add => json!({"op":"add", "path":path, "value":patch.value}),
+                    PatchOperation::Replace => {
+                        json!({"op":"replace", "path":path, "value":patch.value})
+                    }
                     PatchOperation::Remove => {
                         if patch.path.is_empty() {
                             bail!("Desktop state cannot be removed by a root patch.");
@@ -174,13 +170,37 @@ mod tests {
                     PathSegment::Index(0),
                     PathSegment::Key("status".into()),
                 ],
-                value: Some(json!("completed")),
+                value: json!("completed"),
             }])
             .unwrap();
         assert_eq!(
             mirror.state.pointer("/turns/0/status"),
             Some(&json!("completed"))
         );
+    }
+
+    #[test]
+    fn null_is_a_legitimate_patch_value() {
+        let mut mirror = Mirror::from_snapshot(
+            "desktop".into(),
+            StateChange::Snapshot {
+                revision: 1,
+                conversation_state: json!({"turns":[{"status":"running"}]}),
+            },
+        )
+        .unwrap();
+        mirror
+            .apply_patches(vec![DesktopPatch {
+                op: PatchOperation::Add,
+                path: vec![
+                    PathSegment::Key("turns".into()),
+                    PathSegment::Index(0),
+                    PathSegment::Key("error".into()),
+                ],
+                value: json!(null),
+            }])
+            .unwrap();
+        assert_eq!(mirror.state.pointer("/turns/0/error"), Some(&json!(null)));
     }
 
     #[test]
