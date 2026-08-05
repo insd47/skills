@@ -6,8 +6,8 @@ AI 코딩 에이전트에서 사용하는 개인 스킬과 Claude-Codex 협업 �
 
 | 플러그인                                   | 설명                                                               | 지원 제품          |
 |--------------------------------------------|--------------------------------------------------------------------|--------------------|
-| [`insd47`](plugins/insd47/README.md)       | 공용 구현 규칙(`build`)과 Claude-Codex 협업 규칙(`codex-app`) 스킬 | Codex, Claude Code |
-| [`codex-app`](plugins/codex-app/README.md) | Codex App 작업을 Claude Code background task로 위임하는 실행 명령  | Claude Code        |
+| [`insd47`](plugins/insd47/README.md)       | 공용 구현 규칙(`build`)과 Claude-Codex 협업 규칙(`codex`)           | Codex, Claude Code |
+| [`codex-app`](plugins/codex-app/README.md) | Codex App 작업을 Claude Code에서 조율하는 native MCP tools          | Claude Code        |
 
 설치 방법과 상세 동작은 각 플러그인의 README에 있다. 두 플러그인 모두 이 저장소를 marketplace로 등록한 뒤 설치하며, 사용자가 저장소를 직접 clone하거나 스킬 디렉터리에 심볼릭 링크를 만들
 필요는 없다.
@@ -24,10 +24,12 @@ AI 코딩 에이전트에서 사용하는 개인 스킬과 Claude-Codex 협업 �
 
 플러그인 manifest의 버전을 변경하지 않으면 Claude Code가 기존 버전을 계속 사용할 수 있으므로 배포할 때 `version`을 함께 올린다.
 
-검증은 Node.js 22 이상에서 실행한다.
+`codex-app`은 Apple Silicon Mac의 Rust toolchain에서 검증한다.
 
 ```sh
-npm test
-npm run check
+cargo fmt --check --manifest-path plugins/codex-app/Cargo.toml
+cargo test --manifest-path plugins/codex-app/Cargo.toml
+cargo clippy --manifest-path plugins/codex-app/Cargo.toml --all-targets -- -D warnings
+cargo build --release --manifest-path plugins/codex-app/Cargo.toml
 claude plugin validate .
 ```

@@ -1,6 +1,6 @@
 ---
-name: codex-app
-description: Coordinate Claude Code and Codex App as a persistent planning and execution pair. Use when Claude should plan, discuss, review, or orchestrate while Codex performs long implementation or research turns, including continued work in one Codex thread and parallel disposable workers.
+name: codex
+description: Coordinate Claude Code and Codex — the App's persistent task and the CLI — as a planning and execution pair. Use when Claude should plan, discuss, review, or orchestrate while Codex performs long implementation turns in the persistent App task or answers bounded research probes through the CLI.
 ---
 
 # Coordinate Claude and Codex
