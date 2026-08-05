@@ -193,13 +193,17 @@ struct Initialize {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TurnStarted {
+    result: Option<Box<TurnStarted>>,
     turn_id: Option<String>,
     turn: Option<TurnId>,
 }
 
 impl TurnStarted {
+    /// Desktop follower 응답은 method에 따라 turn을 한 겹 더 감싼 result 안에 싣기도 한다.
     fn turn_id(self) -> Option<String> {
-        self.turn_id.or_else(|| self.turn.map(|turn| turn.id))
+        self.turn_id
+            .or_else(|| self.turn.map(|turn| turn.id))
+            .or_else(|| self.result.and_then(|inner| inner.turn_id()))
     }
 }
 
@@ -232,5 +236,12 @@ mod tests {
         let hidden: TurnStarted =
             serde_json::from_value(json!({"other":{"turnId":"hidden"}})).unwrap();
         assert_eq!(hidden.turn_id(), None);
+    }
+
+    #[test]
+    fn turn_id_unwraps_the_follower_result_envelope() {
+        let wrapped: TurnStarted =
+            serde_json::from_value(json!({"result":{"turn":{"id":"wrapped"}}})).unwrap();
+        assert_eq!(wrapped.turn_id().as_deref(), Some("wrapped"));
     }
 }
