@@ -14,6 +14,7 @@ A parent module holds child declarations, selective re-exports, representative t
 
 - An explicit loop beats a combinator chain when termination is part of the meaning — a generator with a visible `break` on the completion frame over `try_unfold` whose end hides in a `None`. Combinators map per item; loops carry protocol control flow.
 - `let .. else` for compute-or-bail bindings; `if let` for optional side effects; `match` for exhaustive dispatch.
+- Error translation picks its shape by coverage: one exceptional variant → borrow-match it (`if let Err(Variant(_)) = &result { return …; }`) and let `?` carry the rest; every variant translated → `map_err` with a `match` inside. Never bend `let .. else` into error translation — its `else` block cannot bind the failure payload.
 - All-mandatory struct literals stay literals — no constructor that relocates the same arguments. Builders are earned only by modes or invariants callers must not hand-assemble.
 - Narrowing conversions show a visible clamp, never a bare `as` that can truncate.
 - Guard early, return early; a blank line follows each guard.
@@ -28,10 +29,11 @@ A parent module holds child declarations, selective re-exports, representative t
 
 ## Errors
 
-- One error vocabulary per crate: anyhow end to end by default; never a second typed layer alongside it in the same crate.
-- Open each error-handling file with `use anyhow::{Error, Result}` (drop `Error` when unnamed) so bare `Result<T>` is the default vocabulary. A crate-global error module — typically a thiserror enum layering anyhow beneath — takes precedence: `use crate::error::{Error, Result}`, used the same bare way.
-- A crate earns a global error module only when callers branch on variants (contract crates, wire types): thiserror enum, a new variant only for a new handling decision, plain-string messages, `pub type Result<T>` colocated, transparent `#[from]` for wrapped sources. No caller branches → no module.
-- `.context("Recorded reason.")` at each meaning boundary; the sink logs the chain once with `{error:#}` and records `error.to_string()`. No per-site `inspect_err`/`map_err` ladders.
+- Pick the crate's regime by whether any consumer needs errors by NAME (translation keys, wire codes, caller branching). No such consumer — internal tools, hobby projects — runs anyhow end to end, single vocabulary, no typed layer. A serious surface with named consumers adopts the typed pattern below; never both regimes in one crate.
+- Public codes are one flat enum per contract surface: variant name is the wire/i18n key (strum-derived), parameters ride in the variant (`FileTooLarge(u64)`), and the producer edge owns an exhaustive status/severity `match`. A new variant only for a new caller decision or a new user-facing message.
+- Module-tier failures are a per-crate `ModuleError` thiserror enum beside the edge `Error`: `#[from]` variants enumerate the crate's absorbed foreign sources — the list is the crate's absorption policy, kept visible — plus `Message(String)` for ad-hoc diagnostics. The edge `Error` keeps its thiserror derive and adds one blanket `impl<E: Into<ModuleError>> From<E> for Error`; the bound is satisfiable only locally, so it coexists with reflexive `From` and the explicit adapters. Coherence rule: a type with its own dedicated `Error` mapping must never get a `#[from]` variant in `ModuleError` — hold such a variant without `#[from]` and construct it inside the adapter.
+- Open each error-handling file with the regime's vocabulary — `use crate::error::{Error, Result}` or `use anyhow::Result` — so bare `Result<T>` is the default spelling.
+- No decoration ladders, in either regime: an annotation that restates what the source error already says is noise — delete it, the source survives in the chain. Identifying data the source cannot name (which env var, which resource) belongs in a variant parameter — or, under anyhow, in the one annotation that carries it. A conversion moves an error between vocabularies, never logs — logging happens once at the sink.
 - Expected absence: `find(...)?.ok_or(...)` — absence is a value; `get` is for must-exist lookups.
 - Detached tokio tasks: `pub async fn run(self, ..)` swallows into one sink; `async fn try_run(&self, ..) -> Result<()>` flows with `?`. A `JoinHandle` nobody joins swallows errors silently — never rely on it.
 
@@ -51,7 +53,11 @@ Follow `rustfmt`; within it:
 - Module-granularity imports: one `use` per parent module path; braces hold only items directly under that path (`use tokio::sync::{Mutex, mpsc, oneshot};`). Never nest braces or put `::` inside them — `use tokio::{io::AsyncBufReadExt, sync::mpsc};` splits into one line per module. IDEs fold the import block, so vertical length is free; flat lines keep diffs, grep, and merges clean.
 - File order: imports/re-exports → `mod` declarations → constants → representative public types top-down (each supporting type just after the type that references it) → private helpers → tests.
 - Pack single-line statements; one blank line around every multi-line construct and between `impl` methods; struct fields and enum variants packed even with doc comments.
-- When the formatter would wrap a line awkwardly, restructure the line — extract a named intermediate — instead of accepting the wrap.
+- Bodies read as paragraphs: statements group by sub-goal — validate, load, decide, apply, respond — with one blank line between groups, and a guard's early return closes its paragraph. Never emit a wall of packed statements spanning multiple sub-goals.
+- rustfmt posture: `max_width = 120` with Default small-heuristics — short calls inline, long chains vertical, small struct literals free to go multiline. When the formatter would wrap a line awkwardly, restructure the line — extract a named intermediate — instead of accepting the wrap or widening limits.
+- Platform-split imports live inside the `#[cfg]` block that uses them; collapse per-platform configuration into one block per function so the cfg seam is a single visible joint, not scattered top-level `#[cfg] use` lines.
+- `#[cfg]` attaches to a declaration, a binding (`let x = { … };`), an expression statement, or a module/function — never to a naked `{ … }` whose only job is grouping. A platform region that wants a block either earns it as a binding or moves into a function owned by the platform-seam module.
+- Bodies reuse imported paths: when a parent module is already in scope, extend it (`commands::auth::login`) instead of restating an absolute `crate::…` path — macro arguments included.
 - Keep harmless duplication that preserves symmetry between siblings; abstract only when the abstraction has one honest name and a stable shared rule.
 
 ## Documentation

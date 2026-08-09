@@ -81,7 +81,7 @@ Choose the narrowest visibility that is true, using boundary shape as the mechan
 ## Two error regimes
 
 - **Structured** (thiserror-class) for errors a caller matches on; new variants only for new handling decisions.
-- **Chained reasons** (anyhow-class) for errors that will be swallowed or logged; context at each meaning boundary, chain logged once at a single sink.
+- **Carried reasons** for errors that end at a single sink: preserve the source chain and log it once there; annotate only with data the source cannot name — an annotation that restates its source is noise.
 - Expected absence is a value (`Option`, find-then-choose), not a not-found error translated later. Translate inline at the one sink that needs it — no error-translation helpers.
 - Detached tasks: an infallible shell owns the single failure sink; the `try_` core flows with `?`. Never return `Result` from a future nobody joins.
 
