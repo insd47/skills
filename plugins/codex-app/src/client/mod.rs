@@ -16,7 +16,7 @@ mod transport;
 
 const INITIAL_CLIENT_ID: &str = "initializing-client";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
-const START_VERSION: u8 = 1;
+const START_VERSION: u8 = 2;
 const STEER_VERSION: u8 = 1;
 const INTERRUPT_VERSION: u8 = 4;
 
@@ -56,7 +56,10 @@ impl Client {
                 START_VERSION,
                 json!({
                     "conversationId":thread_id,
-                    "turnStartParams":{"input":Self::input(prompt),"cwd":cwd}
+                    "turnStart":{
+                        "request":{"threadId":thread_id,"input":Self::input(prompt),"cwd":cwd},
+                        "context":{}
+                    }
                 }),
             )
             .await?;
