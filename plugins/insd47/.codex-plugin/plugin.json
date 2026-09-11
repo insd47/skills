@@ -1,7 +1,7 @@
 {
   "name": "insd47",
-  "version": "0.7.0",
-  "description": "개인 구현 원칙과 Claude-Codex 협업 방식을 제공하는 스킬 모음",
+  "version": "0.8.0",
+  "description": "개인 개발 원칙과 언어별 구현 규칙을 제공하는 빌드 스킬",
   "author": {
     "name": "황인성",
     "url": "https://github.com/insd47"
@@ -11,15 +11,14 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "insd47 Skills",
-    "shortDescription": "개인 구현 원칙과 Claude-Codex 협업 흐름을 적용합니다.",
-    "longDescription": "황인성의 모듈 경계, 접근제어, 조립, 타입 및 오류 처리 감각을 구현에 적용하고 Claude와 Codex가 장기 작업을 효율적으로 나누는 협업 흐름을 제공합니다.",
+    "shortDescription": "개인 개발 원칙과 언어별 구현 규칙을 적용합니다.",
+    "longDescription": "황인성의 모듈 경계, 접근제어, 조립, 타입 및 오류 처리 감각을 구현에 적용하고 작업 범위에 맞는 검증으로 마무리합니다.",
     "developerName": "황인성",
     "category": "Developer Tools",
     "capabilities": ["Write"],
     "defaultPrompt": [
       "이 기능을 내 모듈화 원칙에 맞춰 구현해 줘.",
-      "이 코드를 구조적으로 깔끔하게 리팩터링해 줘.",
-      "Claude와 Codex가 이 작업을 함께 진행하도록 역할을 나눠 줘."
+      "이 코드를 구조적으로 깔끔하게 리팩터링해 줘."
     ]
   }
 }

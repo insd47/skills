@@ -1,7 +1,0 @@
-interface:
-  display_name: "Claude-Codex Collaboration"
-  short_description: "Coordinate persistent Claude and Codex work"
-  default_prompt: "Use $insd47:codex to divide this task between Claude and Codex."
-
-policy:
-  allow_implicit_invocation: true

@@ -1,9 +1,17 @@
 ---
 name: build
-description: Build, modify, or refactor software in Insung Hwang's personal engineering style - minimal owned surface, earned abstractions, borrowed state and conventions, honest signals, top-down readable assembly, proportional error models, invariant-first tests. Applies to new features, bug fixes, refactors, architecture changes, and code generation in any language.
+description: Build, modify, or refactor software in Insung Hwang's engineering style. Use for features, fixes, and architecture changes that need minimal owned surface, clear module boundaries, honest types and errors, and invariant-focused tests.
 ---
 
 # Build Software
+
+## Scope and initiative
+
+The user's request, scope, and established decisions take precedence over this skill. Follow repository requirements and preserve correctness and domain constraints; these preferences guide the remaining design choices.
+
+Apply the rules to the requested change. They are not a reason to expand the task into unrelated cleanup or redesign. Resolve routine, reversible choices from the available evidence and continue authorized implementation through verification. Ask only when a missing decision materially changes the outcome; continue independent work while awaiting it. For research or design requests, deliver the requested analysis.
+
+If a rule appears to block authorized work, check its scope and purpose first. If a conflict remains, identify the exact instruction and the concrete decision needed.
 
 ## The maintainer premise
 
@@ -13,22 +21,15 @@ Prefer, in this order:
 
 1. **Unwritten code.** The language, framework, or an already-present dependency provides the capability → use it as designed. The most efficient code is code that was never written.
 2. **Borrowed code.** A proven library owns the problem class — a protocol, parser, or algorithm you would otherwise hand-write → depend on it instead of rebuilding it. Cover a small need with a few honest lines, not a new dependency.
-3. **Borrowed state.** Hold no state another system already owns. Reference the owner's identifiers and lifecycles; never mint a parallel ID, registry, or cache to track someone else's object. The best state management is no state to manage.
+3. **Borrowed state.** Keep authoritative state with its owner and use that owner's identifiers and lifecycle. Local state must serve a responsibility this code actually owns, with a clear lifetime; tracking another system's object alone does not earn a parallel ID, registry, or cache.
 4. **Borrowed shape.** What must be owned looks like its surroundings — the stack's standard idiom, and the same structure as its sibling modules in this project. Humans read entry-point-first, not by string search; a familiar shape is documentation they have already read.
-5. **Separated concerns.** Each file and struct knows only what its responsibility requires. Loose private helpers piling up at the top of a module are the symptom of a missing layer — extract the layer and they disappear into it. Done well, the entry point narrates the entire flow by itself.
+5. **Separated concerns.** Each file and struct knows only what its responsibility requires. Helpers sharing state, vocabulary, or collaborators may belong to a child module; extract it when that responsibility is real. The entry point should narrate the flow by itself.
 
 Code is a statement of intent: the reader will not ask you questions, so the artifact must answer them. Every structure signals — a trait says "substitution exists", a public item says "outside callers exist", an `Option` says "absence is expected", a test says "someone relies on this". A structure whose signal is false is a defect even when the code runs.
 
-Audit every structure with one question: **what does this buy?** If the honest answer is only syntax, symmetry, or an imagined future, remove it. Tie-breakers: top-down reading cost, a present-day payer for every structure, names and visibility that never lie, usage claims proven by search.
+Judge structures within the change with one question: **what does this buy?** Syntax or an imagined future earns nothing. Consider the cost of reading, changing, and operating the result; fewer structures wins only when it preserves meaningful boundaries and clarity. Prove usage claims by search.
 
-When evidence cannot resolve intent, choose the reversible option and record assumptions and rejected alternatives in the report — a recorded rejection stops the next agent from "fixing" a deliberate choice.
-
-## Priority
-
-1. The user's explicit request and repository-local instructions.
-2. Behavioral correctness, safety, and real domain constraints.
-3. This document — on conflict the maintainer premise decides; still tied, fewer structures wins.
-4. Language and framework conventions.
+Record a deliberate, non-obvious choice where a future maintainer would otherwise undo it. Routine decisions do not need a catalog of rejected alternatives.
 
 ## Language guides
 
@@ -39,18 +40,18 @@ Read completely for each language actually in scope (not merely present elsewher
 
 ## Work from evidence
 
-Before designing, read repository instructions and manifests; inspect the target module, its parent, and one comparable sibling; trace ownership, construction, and error flow across the affected boundary. Extend the established local pattern; distinguish deliberate conventions from unfinished accidents.
+Read the relevant repository instructions and manifests; inspect the target module and the parent or sibling needed to understand its role. Trace ownership, construction, and error flow across the affected boundary. Extend the established local pattern; distinguish deliberate conventions from unfinished accidents. Explore further when an unresolved question could change the implementation.
 
 - Verify every usage claim ("only caller", "unused") by search before acting on it.
 - Do not remove structure you cannot explain — find who built it and why first.
 
 ## The structure razor
 
-Keep each structure only while its condition holds; otherwise remove it, and let the intent it carried survive somewhere honest — a name, a doc line, a test, or a report note.
+Use these criteria to justify structures within the requested change. Caller counts are evidence of reuse; also account for the invariant, responsibility, and reading cost a structure carries. Preserve that intent when removing a structure.
 
-- **Trait / interface**: two+ real implementations, a boundary the concrete type cannot cross (foreign crate), or a test seam locking branchy behavior. One implementation with one call site → call the concrete type.
-- **Named type**: data crossing a boundary with a rule attached (invariant, wire shape, storage shape). A re-spelling of `Result`/`Option`/tuple or a one-caller parameter bundle is not a type; a success/reason enum is already `Result<T, Reason>`.
-- **Helper**: two+ callers, or an isolated pure judgment worth testing. One caller → inline.
+- **Trait / interface**: two+ real implementations, a boundary the concrete type cannot cross (foreign crate), or a test seam locking branchy behavior. Use the concrete type when none of these applies.
+- **Named type**: data crossing a boundary with a rule attached (invariant, wire shape, storage shape). Re-spelling `Result`/`Option`/tuple or shortening one signature does not earn a type; use `Result<T, Reason>` when it already expresses the success/failure contract.
+- **Helper**: shared logic, an isolated pure judgment worth testing, or a named step that makes assembly readable. Inline a one-caller helper when the call adds no meaning or boundary.
 - **Context object**: fields that were threaded through two+ functions become `self`. Shortening a signature earns nothing.
 - **Module / file**: own vocabulary, invariant, or collaborators. Never split on length; a file of pure delegation merges away.
 - **Extension trait**: a library for callers you do not know. Internal plumbing uses module-qualified free functions.
@@ -98,22 +99,12 @@ Classify what each pipeline step consumes of a dependency — values, types, or 
 
 ## Tests are executable intent
 
-Keep a test that locks an invariant someone relies on, an exact boundary value, an incident-backed regression, or branchy behavior structure cannot guarantee. Delete a test that re-verifies what structure already guarantees. Prefer offline tests — a fixture may assemble real handles that never perform I/O. Protocol tests include adversarial sizes and awkward split boundaries.
+Choose tests that protect relied-on invariants, exact boundary values, incident-backed regressions, or branchy behavior structure cannot guarantee. Avoid tests that merely restate a reversible, low-impact edit. Retire an existing test only when its guarantee is demonstrably structural or covered elsewhere and no distinct regression protection is lost. Prefer offline tests — a fixture may assemble real handles that never perform I/O. Protocol tests include adversarial sizes and awkward split boundaries.
 
 ## Verify proportionally, then stop
 
-Discover the repository's own commands; run the narrowest check that could disprove the change first, expanding with risk: formatter, static analysis, focused tests, full tests, build, runtime smoke. Stop once the identified risk is answered — do not re-run green suites or verify behavior the change cannot touch.
+Discover the repository's own commands and required checks. Start with the narrowest check that could disprove the change; expand according to risk. Formatter, static analysis, focused tests, full tests, build, and runtime smoke are verification options, not a mandatory sequence for every edit. Once required checks pass and the changed behavior is supported, finish. Repeat or broaden checks only for new edits, failures, or unresolved concerns.
 
 ## Report
 
-State: what changed; structural signals added or removed and why; checks run and skipped; assumptions; alternatives rejected and the reason. Mark any decision not grounded in evidence as such.
-
-## Final audit
-
-- The change owns nothing the language, a library, another system's state, or an existing pattern could have carried.
-- Assembly points read top-down without opening leaves.
-- Every structure answers "what does this buy?" with something real.
-- Visibility, names, and types send only true signals.
-- Each error carries its reason to exactly one sink.
-- Tests lock invariants, not restatements.
-- The report makes every non-obvious choice auditable.
+Lead with the result, then explain important design choices and verification. Use concise prose; reserve lists for information that benefits from comparison. Distinguish static checks from observed runtime behavior, and state material gaps or assumptions. Include rejected alternatives only when they explain a consequential choice.

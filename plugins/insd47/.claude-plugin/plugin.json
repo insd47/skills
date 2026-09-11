@@ -1,7 +1,7 @@
 {
   "name": "insd47",
-  "version": "0.7.1",
-  "description": "개인 구현 원칙과 Claude-Codex 협업 방식을 제공하는 스킬 모음",
+  "version": "0.8.0",
+  "description": "개인 개발 원칙과 언어별 구현 규칙을 제공하는 빌드 스킬",
   "author": {
     "name": "황인성"
   },

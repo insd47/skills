@@ -4,7 +4,7 @@ Apply with `SKILL.md` when Rust files are in scope.
 
 ## Visibility: plain `pub` behind private ancestors
 
-The module tree is the entire access-control mechanism. `mod child;` is private; a `pub` item inside it is a subtree contract sealed by the private ancestor. `pub use` at the parent adopts a concept into the parent's vocabulary; `pub mod` when callers deliberately enter the subdomain — they speak the child's path (`infra::judge::JudgeStream`) and import several of its items — and then it beats item-by-item re-export. Never `pub(crate)` or `pub(super)` in production code: needing one means a misdrawn boundary — reshape the tree or re-export at the honest ancestor, and treat existing ones as in-scope cleanup. Single exception: `#[cfg(test)]` seams may use `pub(super)`, where the distance modifier truthfully says "tests in this subtree only".
+Use the module tree as the access-control mechanism. `mod child;` is private; a `pub` item inside it is a subtree contract sealed by the private ancestor. `pub use` at the parent adopts a concept into the parent's vocabulary; `pub mod` when callers deliberately enter the subdomain — they speak the child's path (`infra::judge::JudgeStream`) and import several of its items — and then it beats item-by-item re-export. For boundaries created or restructured by this change, use private ancestors and deliberate re-exports instead of `pub(crate)` or `pub(super)` in production code. This preference does not expand the cleanup scope. Single exception: `#[cfg(test)]` seams may use `pub(super)`, where the distance modifier truthfully says "tests in this subtree only".
 
 ## Facades
 
@@ -66,8 +66,8 @@ Follow `rustfmt`; within it:
 
 ## Tests
 
-Boundary tests assert exact edges (`expires_at == now` rejects; the entrance boundary admits). Protocol tests feed adversarial input: oversized payloads split at awkward chunk boundaries, mid-prefix, mid-token. Offline first — fixtures may assemble real clients that never perform I/O (test credentials, `capture_request` harnesses, `#[cfg(test)]` stub constructors). Test names state the invariant (`scored_requests_never_return_test_io`). Retire a test whose subject became structurally guaranteed; note the retirement in the report.
+Boundary tests assert exact edges (`expires_at == now` rejects; the entrance boundary admits). Protocol tests feed adversarial input: oversized payloads split at awkward chunk boundaries, mid-prefix, mid-token. Offline first — fixtures may assemble real clients that never perform I/O (test credentials, `capture_request` harnesses, `#[cfg(test)]` stub constructors). Test names state the invariant (`scored_requests_never_return_test_io`). Use the shared test-retirement rule in `SKILL.md` and explain why a retired test no longer adds coverage.
 
 ## Verify
 
-Run the narrowest applicable commands: `cargo fmt --check`, clippy on the touched crates, focused tests, then the workspace suite when the change crosses crates. Unit tests live beside pure judgments — parsing, scoring, state transitions, validators. State what ran and what requires an environment you do not have.
+Follow the verification rule in `SKILL.md`. Use `cargo fmt --check`, clippy on touched crates, and focused tests as applicable; cross-crate behavior may require the workspace suite. Complete repository-required checks. Unit tests live beside pure judgments — parsing, scoring, state transitions, validators. State what ran and what requires an environment you do not have.

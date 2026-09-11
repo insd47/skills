@@ -98,4 +98,4 @@ Almost no inline comments. Exported functions, hooks, and non-obvious components
 
 ## Verify
 
-Run the repository's formatter, linter, type checker, focused tests, and build. Verify rendered state or interaction for React behavior when practical; add focused tests for state transitions, parsing, validation, and regressions. No generic harness or mock architecture for one small component — test through the smallest stable public surface.
+Follow the verification rule in `SKILL.md`. Choose the relevant repository formatter, linter, type checker, focused tests, or build, and complete required checks. For changed React behavior, verify the rendered state or interaction when practical. When test coverage is needed, target state transitions, parsing, validation, and regressions. No generic harness or mock architecture for one small component — test through the smallest stable public surface.

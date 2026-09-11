@@ -7,7 +7,8 @@ Codex와 Claude Code가 동일한 스킬 본문을 사용하는 공용 스킬 �
 - [`build`](skills/build/SKILL.md) — 개인 구현 스타일의 핵심 구현 규칙. 언어별 규칙은 실제 작업 언어에 따라 선택적으로 로드한다.
   - [Rust](skills/build/languages/RUST.md)
   - [TypeScript 및 TSX](skills/build/languages/TYPESCRIPT.md)
-- [`codex`](skills/codex/SKILL.md) — Claude가 계획·비평·조율을, Codex가 구현·조사를 맡는 협업 규칙. 구현은 `codex-app` 플러그인의 `ask` MCP tool로 persistent task에 위임하고, 조사는 `codex` CLI를 background task로 직접 실행한다.
+
+`build`는 [GPT-6 Astra 프롬프팅 가이드](https://developers.openai.com/api/docs/guides/latest-model#prompting-best-practices)를 참고해 사용자 지시의 우선순위, 작업 범위, 자율 실행, 비례 검증과 보고 기준을 다듬었다. 모델 선택이나 에이전트 간 역할 분담은 정하지 않는다.
 
 ## Codex 설치
 
@@ -25,7 +26,7 @@ codex plugin marketplace upgrade insd47-skills
 codex plugin add insd47@insd47-skills
 ```
 
-공용 스킬은 `$insd47:build`와 `$insd47:codex`다. 요청과 설명이 일치하면 에이전트가 자동으로 선택할 수도 있다.
+스킬은 `$insd47:build`로 호출한다. 요청과 설명이 일치하면 에이전트가 자동으로 선택할 수도 있다.
 
 ## Claude Code 설치
 
@@ -43,4 +44,4 @@ claude plugin marketplace update insd47-skills
 claude plugin update insd47@insd47-skills
 ```
 
-공용 규칙은 `/insd47:build`와 `/insd47:codex`로 호출한다. `codex` 협업 규칙은 구현 위임에 별도 실행 플러그인(`codex-app`)의 native MCP tools를, 조사 위임에 `codex` CLI를 사용한다.
+같은 빌드 규칙은 `/insd47:build`로 호출한다.

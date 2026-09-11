@@ -6,7 +6,7 @@ AI 코딩 에이전트에서 사용하는 개인 스킬과 Claude-Codex 협업 �
 
 | 플러그인                                   | 설명                                                               | 지원 제품          |
 |--------------------------------------------|--------------------------------------------------------------------|--------------------|
-| [`insd47`](plugins/insd47/README.md)       | 공용 구현 규칙(`build`)과 Claude-Codex 협업 규칙(`codex`)           | Codex, Claude Code |
+| [`insd47`](plugins/insd47/README.md)       | 개인 개발 원칙과 언어별 구현 규칙(`build`)                        | Codex, Claude Code |
 | [`codex-app`](plugins/codex-app/README.md) | Codex App 작업을 Claude Code에서 조율하는 native MCP tools          | Claude Code        |
 
 설치 방법과 상세 동작은 각 플러그인의 README에 있다. 두 플러그인 모두 이 저장소를 marketplace로 등록한 뒤 설치하며, 사용자가 저장소를 직접 clone하거나 스킬 디렉터리에 심볼릭 링크를 만들
