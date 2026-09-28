@@ -94,7 +94,7 @@ Follow the repository formatter; within it keep the vertical rhythm from `SKILL.
 
 One import block, no blank lines inside; inline the `type` modifier when mixing (`import { use, type ComponentProps } from 'react'`); `import type` for type-only modules.
 
-Almost no inline comments. Exported functions, hooks, and non-obvious components get a short JSDoc in Korean with technical nouns in English; document a destructured option as `@param property`, never `@param param0.property`. No commented-out code. Favor early returns; keep an existing order that tells a clearer story.
+Almost no inline comments. Exported functions, hooks, and non-obvious components get a short JSDoc in Korean with technical nouns in English and particles attached without a space (`hook을`); document a destructured option as `@param property`, never `@param param0.property`. No commented-out code. Favor early returns; keep an existing order that tells a clearer story.
 
 ## Verify
 

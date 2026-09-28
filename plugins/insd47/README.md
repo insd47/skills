@@ -7,8 +7,9 @@ Codex와 Claude Code가 동일한 스킬 본문을 사용하는 공용 스킬 �
 - [`build`](skills/build/SKILL.md) — 개인 구현 스타일의 핵심 구현 규칙. 언어별 규칙은 실제 작업 언어에 따라 선택적으로 로드한다.
   - [Rust](skills/build/languages/RUST.md)
   - [TypeScript 및 TSX](skills/build/languages/TYPESCRIPT.md)
+- [`commit`](skills/commit/SKILL.md) — `type: 한국어 명사형 제목` 형식의 커밋 컨벤션. 본문 없이 제목만 쓰고, 조사는 영문·코드 토큰에 붙여 쓴다.
 
-`build`는 [GPT-6 Astra 프롬프팅 가이드](https://developers.openai.com/api/docs/guides/latest-model#prompting-best-practices)를 참고해 사용자 지시의 우선순위, 작업 범위, 자율 실행, 비례 검증과 보고 기준을 다듬었다. 모델 선택이나 에이전트 간 역할 분담은 정하지 않는다.
+스킬 본문은 주력 모델인 Claude Opus 5.5의 [프롬프팅 가이드](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5)에 맞춰 작업 범위와 검증·보고 지시를 줄였다. 모델이 스스로 하는 재검증과 범위 확장을 부추기는 문장을 두지 않으며, Codex에서도 같은 본문을 사용한다.
 
 ## Codex 설치
 
@@ -26,7 +27,7 @@ codex plugin marketplace upgrade insd47-skills
 codex plugin add insd47@insd47-skills
 ```
 
-스킬은 `$insd47:build`로 호출한다. 요청과 설명이 일치하면 에이전트가 자동으로 선택할 수도 있다.
+스킬은 `$insd47:build`, `$insd47:commit`으로 호출한다. 요청과 설명이 일치하면 에이전트가 자동으로 선택할 수도 있다.
 
 ## Claude Code 설치
 
@@ -44,4 +45,4 @@ claude plugin marketplace update insd47-skills
 claude plugin update insd47@insd47-skills
 ```
 
-같은 빌드 규칙은 `/insd47:build`로 호출한다.
+같은 스킬은 `/insd47:build`, `/insd47:commit`으로 호출한다.

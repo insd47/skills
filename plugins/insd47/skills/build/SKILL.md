@@ -1,6 +1,6 @@
 ---
 name: build
-description: Build, modify, or refactor software in Insung Hwang's engineering style. Use for features, fixes, and architecture changes that need minimal owned surface, clear module boundaries, honest types and errors, and invariant-focused tests.
+description: Builds, modifies, and refactors software in Insung Hwang's engineering style - minimal owned surface, earned abstractions, hierarchical modules, honest types and errors, invariant-focused tests. Use when implementing features, fixing bugs, refactoring, or changing architecture in any language, especially Rust and TypeScript.
 ---
 
 # Build Software
@@ -9,20 +9,20 @@ description: Build, modify, or refactor software in Insung Hwang's engineering s
 
 The user's request, scope, and established decisions take precedence over this skill. Follow repository requirements and preserve correctness and domain constraints; these preferences guide the remaining design choices.
 
-Apply the rules to the requested change. They are not a reason to expand the task into unrelated cleanup or redesign. Resolve routine, reversible choices from the available evidence and continue authorized implementation through verification. Ask only when a missing decision materially changes the outcome; continue independent work while awaiting it. For research or design requests, deliver the requested analysis.
+Deliver what was asked, at the scope intended. The rules shape the code you touch; they are not a license to clean up or redesign code the change does not need. Make routine, reversible judgment calls yourself and check in only when different readings of the request would lead to materially different work. If the request seems mistaken or a better approach exists, say so in a sentence and continue with the task as asked rather than quietly narrowing, widening, or transforming it.
 
-If a rule appears to block authorized work, check its scope and purpose first. If a conflict remains, identify the exact instruction and the concrete decision needed.
+Existing comments belong to the maintainer, who often edits them by hand. During structural work, move them with their code instead of deleting them, and report the locations of any that became stale.
 
 ## The maintainer premise
 
-One person maintains this code, alone. Every surface that exists — line, type, layer, state, dependency wrapper — is a surface they must keep alive, and every signal that lies costs them a wrong decision later. Therefore: **own as little as possible, and make everything owned tell the truth.**
+One architect owns this code's design, and someone else — possibly from another language — must be able to take it over. Every surface that exists — line, type, layer, state, dependency wrapper — is a surface someone must keep alive, and every signal that lies costs the next reader a wrong decision. Therefore: **own as little as possible, and make everything owned tell the truth.**
 
 Prefer, in this order:
 
 1. **Unwritten code.** The language, framework, or an already-present dependency provides the capability → use it as designed. The most efficient code is code that was never written.
-2. **Borrowed code.** A proven library owns the problem class — a protocol, parser, or algorithm you would otherwise hand-write → depend on it instead of rebuilding it. Cover a small need with a few honest lines, not a new dependency.
-3. **Borrowed state.** Keep authoritative state with its owner and use that owner's identifiers and lifecycle. Local state must serve a responsibility this code actually owns, with a clear lifetime; tracking another system's object alone does not earn a parallel ID, registry, or cache.
-4. **Borrowed shape.** What must be owned looks like its surroundings — the stack's standard idiom, and the same structure as its sibling modules in this project. Humans read entry-point-first, not by string search; a familiar shape is documentation they have already read.
+2. **Borrowed code.** A proven library owns the problem class — a protocol, parser, or algorithm you would otherwise hand-write → depend on it instead of rebuilding it. The same holds for formats: a standard encoding and framing over a custom one or binary smuggled through base64, so any other implementation can already read it. Cover a small need with a few honest lines, not a new dependency.
+3. **Borrowed state.** Keep authoritative state with its owner and use that owner's identifiers and lifecycle. Local state must serve a responsibility this code actually owns, with a clear lifetime; tracking another system's object alone does not earn a parallel ID, registry, or cache. Configuration is state too: infer it from its owner — the credential's region, a linked resource's name — before adding a constant or environment variable, because every duplicated contract value is a future mismatch between systems. Where an override is genuinely needed, expose it on the builder, not in the environment.
+4. **Borrowed shape.** What must be owned looks like its surroundings — the stack's standard idiom, and the same structure as its sibling modules in this project. Humans read by directory structure and recognized file patterns, not by string search as an agent does; a familiar shape is documentation they have already read, and a file that breaks its pattern costs them more than any number of lines.
 5. **Separated concerns.** Each file and struct knows only what its responsibility requires. Helpers sharing state, vocabulary, or collaborators may belong to a child module; extract it when that responsibility is real. The entry point should narrate the flow by itself.
 
 Code is a statement of intent: the reader will not ask you questions, so the artifact must answer them. Every structure signals — a trait says "substitution exists", a public item says "outside callers exist", an `Option` says "absence is expected", a test says "someone relies on this". A structure whose signal is false is a defect even when the code runs.
@@ -53,12 +53,18 @@ Use these criteria to justify structures within the requested change. Caller cou
 - **Named type**: data crossing a boundary with a rule attached (invariant, wire shape, storage shape). Re-spelling `Result`/`Option`/tuple or shortening one signature does not earn a type; use `Result<T, Reason>` when it already expresses the success/failure contract.
 - **Helper**: shared logic, an isolated pure judgment worth testing, or a named step that makes assembly readable. Inline a one-caller helper when the call adds no meaning or boundary.
 - **Context object**: fields that were threaded through two+ functions become `self`. Shortening a signature earns nothing.
-- **Module / file**: own vocabulary, invariant, or collaborators. Never split on length; a file of pure delegation merges away.
-- **Extension trait**: a library for callers you do not know. Internal plumbing uses module-qualified free functions.
+- **Module / file**: own vocabulary, invariant, or collaborators. Never split on length; a file of pure delegation merges away. Place each item at the lowest common ancestor of its users: logic only one domain uses lives under that domain, and something two siblings share moves up to their common parent.
+- **Extension trait**: a library for callers you do not know, or a one-word verb that keeps a chain on a foreign type readable. Language guides decide how internal plumbing is spelled.
 
-## Boundaries pass data
+## Split by domain, assemble in the caller
 
-Between layers pass values — results, enums, streams — not behavior: a worker returns its verdict, the caller applies effects. Inject behavior (trait, callback) only when the receiving layer cannot name the concrete type.
+Split an abstraction by domain responsibility into components that do not know each other: each constructor takes its own configuration, never a sibling component, and the caller assembles the flow by passing one component's output to the next. The assembly then reads as the story, and each component stays usable alone.
+
+This is the horizontal half of the module tree. The tree hides each component's internals beneath it, so no outsider reaches in; assembly keeps siblings from depending on each other, which visibility alone cannot stop. The caller that assembles is the common parent, and it wires only its children's front doors — never internals lifted up for the purpose.
+
+Between layers pass values — results, enums, streams — not behavior: a worker returns its verdict, the caller applies effects. A component reports every fact it observes and the caller decides what to show. Inject behavior (trait, callback) only when the receiving layer cannot name the concrete type — for instance, data the caller owns, requested through a provider trait at the moment it is needed.
+
+Progress arrives by push — a stream, a subscription, a notification — rather than by polling; poll only when the source offers nothing else.
 
 ## Assembly is the story
 
@@ -74,8 +80,9 @@ Choose the narrowest visibility that is true, using boundary shape as the mechan
 
 ## Names
 
-- Modules name worlds; functions name what they yield or do — `stream::payload(response)`, then `stream::sse(payloads)`.
-- One-word methods where the receiver carries context; `try_` marks the `Result` core of an error-swallowing shell.
+- Modules name worlds; operations name what they yield or do, in one word where the receiver or module carries the context.
+- `try_` marks the `Result` core of an error-swallowing shell.
+- Names stay symmetric with their counterparts: a package matches its repository, a binary matches the resource it deploys as, a port mirrors the upstream name it ports.
 - Wire and storage quantities carry units in the name: `time_ms`, `memory_limit_bytes`.
 - Never re-alias a project-owned name — fix it at the declaration. Same name in two layers → owning-module path (`tables::ExecutionState`). A long foreign name used repeatedly in one file may take a role-named local alias.
 
@@ -99,12 +106,12 @@ Classify what each pipeline step consumes of a dependency — values, types, or 
 
 ## Tests are executable intent
 
-Choose tests that protect relied-on invariants, exact boundary values, incident-backed regressions, or branchy behavior structure cannot guarantee. Avoid tests that merely restate a reversible, low-impact edit. Retire an existing test only when its guarantee is demonstrably structural or covered elsewhere and no distinct regression protection is lost. Prefer offline tests — a fixture may assemble real handles that never perform I/O. Protocol tests include adversarial sizes and awkward split boundaries.
+Choose tests that protect relied-on invariants, exact boundary values, incident-backed regressions, or branchy behavior structure cannot guarantee. Avoid tests that merely restate a reversible, low-impact edit. Retire an existing test only when its guarantee is demonstrably structural or covered elsewhere and no distinct regression protection is lost. Tests adapt to the production structure, never the reverse: do not split a router, widen a visibility, or add a seam so a test can reach something — test through the assembled surface instead. Prefer offline tests — a fixture may assemble real handles that never perform I/O. Protocol tests include adversarial sizes and awkward split boundaries.
 
 ## Verify proportionally, then stop
 
-Discover the repository's own commands and required checks. Start with the narrowest check that could disprove the change; expand according to risk. Formatter, static analysis, focused tests, full tests, build, and runtime smoke are verification options, not a mandatory sequence for every edit. Once required checks pass and the changed behavior is supported, finish. Repeat or broaden checks only for new edits, failures, or unresolved concerns.
+Use the repository's own commands and required checks, choosing the narrowest ones that could disprove the change. Formatter, static analysis, tests, build, and runtime smoke are options matched to risk, not a sequence to run on every edit. Once required checks pass, finish; do not re-run green suites.
 
 ## Report
 
-Lead with the result, then explain important design choices and verification. Use concise prose; reserve lists for information that benefits from comparison. Distinguish static checks from observed runtime behavior, and state material gaps or assumptions. Include rejected alternatives only when they explain a consequential choice.
+Lead with the outcome, then the design choices that matter and what was checked, in concise prose. Distinguish static checks from observed runtime behavior and state material gaps or assumptions.
