@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Writes git commit messages and squash-merge titles in Insung Hwang's convention - a conventional type prefix with a short Korean noun-form subject and no body. Use when creating a commit, amending a commit message, or writing a merge commit in the maintainer's repositories.
+description: Writes git commit messages and merge commit titles in Insung Hwang's convention - a conventional type prefix with a short Korean noun-form subject and no body. Use when creating a commit, amending a commit message, or writing a merge commit in the maintainer's repositories.
 ---
 
 # Commit
