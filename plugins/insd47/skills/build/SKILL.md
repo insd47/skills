@@ -108,6 +108,10 @@ Classify what each pipeline step consumes of a dependency — values, types, or 
 
 Choose tests that protect relied-on invariants, exact boundary values, incident-backed regressions, or branchy behavior structure cannot guarantee. Avoid tests that merely restate a reversible, low-impact edit. Retire an existing test only when its guarantee is demonstrably structural or covered elsewhere and no distinct regression protection is lost. Tests adapt to the production structure, never the reverse: do not split a router, widen a visibility, or add a seam so a test can reach something — test through the assembled surface instead. Prefer offline tests — a fixture may assemble real handles that never perform I/O. Protocol tests include adversarial sizes and awkward split boundaries.
 
+## Rhythm survives formatting
+
+Formatters (rustfmt, prettier) break long lines into multi-line constructs, and multi-line constructs packed against each other read as a wall. After formatting, re-read the changed code for rhythm: a blank line before and after every construct that now spans several lines, and paragraph breaks between sub-goals.
+
 ## Verify proportionally, then stop
 
 Use the repository's own commands and required checks, choosing the narrowest ones that could disprove the change. Formatter, static analysis, tests, build, and runtime smoke are options matched to risk, not a sequence to run on every edit. Once required checks pass, finish; do not re-run green suites.
