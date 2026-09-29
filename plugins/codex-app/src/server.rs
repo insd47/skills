@@ -7,7 +7,7 @@ use rmcp::model::{Implementation, ServerCapabilities, ServerInfo};
 use rmcp::{Json, ServerHandler, ServiceExt, tool, tool_handler, tool_router};
 use std::path::PathBuf;
 
-const INSTRUCTIONS: &str = "Use ask for implementation and follow-up work in the persistent Codex App task. ask blocks until the turn completes and returns the final result. Claude Code 2.1.212+ automatically backgrounds MCP calls that run longer than 2 minutes and delivers completion through a task notification. Calling ask during an active turn steers it and returns immediately. Pass the threadId and turnId reported by ask to status, steer, or interrupt. Use the codex CLI directly for parallel or disposable research; the insd47:codex skill guides that workflow.";
+const INSTRUCTIONS: &str = "Use ask for implementation and follow-up work in the persistent Codex App task. ask blocks until the turn completes and returns the final result. Claude Code 2.1.212+ automatically backgrounds MCP calls that run longer than 2 minutes and delivers completion through a task notification. Calling ask during an active turn steers it and returns immediately. Pass the threadId and turnId reported by ask to status, steer, or interrupt. Use the codex CLI directly for parallel or disposable research.";
 
 #[derive(Clone)]
 pub struct Server {
