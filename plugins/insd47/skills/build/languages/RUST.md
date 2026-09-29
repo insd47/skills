@@ -1,13 +1,11 @@
 # Rust
 
-Apply with `SKILL.md` when Rust files are in scope. The maintainer's older Rust code does not yet follow every rule here; code this change touches takes the shape described here rather than the legacy shape, but that never widens the change to untouched code.
+Apply with `SKILL.md` when Rust files are in scope, under its rule on whose conventions apply.
 
 ## Files and hierarchy
 
 - Every file follows one of the shapes under File shapes, and its name says which world it holds.
 - A folder module is `foo/mod.rs`, so one folder holds one whole module; a leaf stays a flat `foo.rs`. `mod.rs` holds declarations, selective re-exports, and the module's representative items.
-- A module used by only one parent lives under that parent. The crate root keeps only what several modules share.
-- One crate sits flat at the repository root; a feature flag beats splitting off a `-build` crate. The README replaces `examples/`.
 
 ## Visibility: plain `pub` behind private ancestors
 
@@ -22,11 +20,12 @@ A parent module holds child declarations, selective re-exports, representative t
 Independent components compose through streams in the caller. A request is a builder implementing `IntoFuture`; a result stream is a named opaque type implementing `Stream`; a provider trait returns `impl Future + Send` rather than boxing into `dyn`:
 
 ```rust
-let runner = Runner::new().await?;
-let checker = Checker::new();
-let scorer = Scorer::new(&policy);
+let runner = Runner::new().await;
+let checker = Checker::new(&wasm)?;
+let scorer = Scorer::new(&problem)?;
 
-let scores = scorer.score(checker.check(runner.run(source).cases(cases).await?, &assets));
+let runs = runner.run(source, Limits::from(&problem)).problem(&problem, &tests).await?;
+let mut scores = scorer.score(checker.check(runs, &tests));
 ```
 
 ## File shapes
@@ -50,7 +49,6 @@ Prefer a derive to a hand-written trait impl when callers gain the derive's ergo
 - Typed error translation picks its shape by coverage: one exceptional variant → borrow-match it (`if let Err(Variant(_)) = &result { return …; }`) and let `?` carry the rest; every variant translated → `map_err` with a `match` inside. Never bend `let .. else` into error translation — its `else` block cannot bind the failure payload.
 - All-mandatory struct literals stay literals — no constructor that relocates the same arguments. Builders are earned by optional overrides (`.stage("dev")`), modes, or invariants callers must not hand-assemble.
 - Narrowing conversions show a visible clamp, never a bare `as` that can truncate.
-- Guard early, return early; a blank line follows each guard.
 
 ## Names
 
@@ -60,18 +58,15 @@ Prefer a derive to a hand-written trait impl when callers gain the derive's ergo
 
 ## Errors
 
-- Every crate carries failures as `anyhow::Error`; what varies is whether an edge classifies them. Internal tools with no consumer that needs errors by NAME (translation keys, wire codes, caller branching) run anyhow end to end. A surface with named consumers adds a classification at its edge — never a parallel error hierarchy that absorbs foreign types, which cuts the chain and becomes a write-only registry.
-- The classification is one flat enum per contract surface (`ErrorCode`): the variant name is the wire/i18n key (strum-derived), parameters ride in the variant (`FileTooLarge(u64)`), and a variant exists only when the consumer renders or acts differently on it. The producer edge owns the exhaustive status/severity `match`.
-- The edge error is `struct Error { code: Option<ErrorCode>, cause: anyhow::Error }` (or `status: StatusCode` when the only consumer reads HTTP status) with one blanket `impl<E: Into<anyhow::Error>> From<E> for Error` that classifies once, at construction, by downcasting the chain (`keygrip::Error::NotFound` → `NotFound`). Classifying at construction keeps the code alive through any later `.context`; a new local meaning is tagged at the failure site (`.context(ErrorCode::Forbidden)`, `.status(StatusCode::FORBIDDEN)`) instead of a new adapter. The edge error deliberately does not implement `std::error::Error` — the blanket `From` would otherwise overlap the reflexive `From<T> for T`. For the same reason a thiserror enum with `#[error(transparent)] Other(#[from] anyhow::Error)` cannot also take foreign errors through `?`. The core is about fifty lines and is duplicated per edge crate on purpose: orphan rules forbid implementing `IntoResponse` or `Serialize` for a shared type.
-- thiserror stays for named domain types a caller matches on (`BuildError::Budget`) and for libraries' public errors, marked `#[non_exhaustive]`.
+- Packages others depend on define their errors with thiserror, marked `#[non_exhaustive]`, so callers can match on them. Applications use anyhow end to end. Never mix both regimes in one crate.
 - Open each error-handling file with the regime's vocabulary — `use crate::error::{Error, Result}` or `use anyhow::Result` — so bare `Result<T>` is the default spelling.
 - No decoration ladders: an annotation that restates what the source error already says is noise — delete it, the source survives in the chain. Identifying data the source cannot name (which env var, which resource) belongs in a variant parameter — or, under anyhow, in the one annotation that carries it. A conversion moves an error between vocabularies, never logs — logging happens once at the sink.
 - Spend as few lines as possible on failure. Under anyhow, an `Option` becomes a failure through `.context("…")` — not `ok_or_else(|| anyhow!(…))` — and a `bool` guard joins the same chain through `then_some(())`. A `Result` takes `.context` only under the decoration rule above (a user-facing explanation or identifying data the source cannot name); otherwise `?` carries it unchanged, and `map_err` is left for typed translation:
 
   ```rust
   // routes/registry/yank.rs — `status` is the HTTP crate's extension trait (see HTTP services)
-  claims.scope.yank.then_some(()).context("yank은 사람 토큰으로만 할 수 있습니다.").status(StatusCode::FORBIDDEN)?;
-  let record = ctx.crates.find(&name).await?.context("없는 crate입니다.").status(StatusCode::NOT_FOUND)?;
+  claims.scope.yank.then_some(()).context("yank은 사람 토큰으로만 할 수 있습니다").status(StatusCode::FORBIDDEN)?;
+  let record = ctx.crates.find(&name).await?.context("없는 crate입니다").status(StatusCode::NOT_FOUND)?;
   ```
 
 - Expected absence is a value: services return `Option` from `find`; `get` is for must-exist lookups.
@@ -79,11 +74,11 @@ Prefer a derive to a hand-written trait impl when callers gain the derive's ergo
 
 ## Constants
 
-Keep constants few. Contract and configuration values — region, application name, resource names — are inferred from credentials or linked resources, since each hard-coded copy can drift from the infrastructure it names. What remains gets a name: protocol facts (hosts, control bytes) and tuning values. Timing and tuning constants sit at the top of the using file, typed as what they represent (`const KEEP_ALIVE: Duration = Duration::from_secs(15);`). Wire constants — addresses, control bytes, frame layouts — get a dedicated `command`/`protocol`/`params` module. Compute derived constants from their sources; group digits with underscores.
+Keep constants few; infer configuration as `SKILL.md` describes. What remains gets a name: protocol facts (hosts, control bytes) and tuning values. Timing and tuning constants sit at the top of the using file, typed as what they represent (`const KEEP_ALIVE: Duration = Duration::from_secs(15);`). Wire constants — addresses, control bytes, frame layouts — get a dedicated `command`/`protocol`/`params` module. Compute derived constants from their sources; group digits with underscores.
 
 ## Concurrency
 
-Async marks genuine waiting. `tokio::spawn` appears at the assembly point so task lifetime is visible where the system is wired; the spawned future returns `()` and handles its own failures. Join tasks only when they form one logical operation. Timeouts explicit and domain-readable.
+Async marks genuine waiting. A spawned future returns `()` and handles its own failures. Join tasks only when they form one logical operation. Timeouts explicit and domain-readable.
 
 ## Lints
 
@@ -103,12 +98,10 @@ Follow `rustfmt`; within it:
 - Module-granularity imports: one `use` per parent module path; braces hold only items directly under that path (`use tokio::sync::{Mutex, mpsc, oneshot};`). Never nest braces or put `::` inside them — `use tokio::{io::AsyncBufReadExt, sync::mpsc};` splits into one line per module. IDEs fold the import block, so vertical length is free; flat lines keep diffs, grep, and merges clean.
 - File order: imports/re-exports → `mod` declarations → constants → representative public types top-down (each supporting type just after the type that references it) → private helpers → tests.
 - Pack single-line statements; one blank line around every multi-line construct and between `impl` methods; struct fields and enum variants packed even with doc comments.
-- Bodies read as paragraphs: statements group by sub-goal — validate, load, decide, apply, respond — with one blank line between groups, and a guard's early return closes its paragraph. Never emit a wall of packed statements spanning multiple sub-goals.
 - rustfmt posture: `max_width = 120` and nothing else — short calls inline, long chains vertical, small struct literals free to go multiline. When the formatter would wrap a line awkwardly, restructure the line — extract a named intermediate — instead of accepting the wrap or widening limits.
 - Platform-split imports live inside the `#[cfg]` block that uses them; collapse per-platform configuration into one block per function so the cfg seam is a single visible joint, not scattered top-level `#[cfg] use` lines.
 - `#[cfg]` attaches to a declaration, a binding (`let x = { … };`), an expression statement, or a module/function — never to a naked `{ … }` whose only job is grouping. A platform region that wants a block either earns it as a binding or moves into a function owned by the platform-seam module.
 - Bodies reuse imported paths: when a parent module is already in scope, extend it (`commands::auth::login`) instead of restating an absolute `crate::…` path — macro arguments included.
-- Keep harmless duplication that preserves symmetry between siblings; abstract only when the abstraction has one honest name and a stable shared rule.
 
 ## HTTP services
 
@@ -117,16 +110,12 @@ Follow `rustfmt`; within it:
 - Exception: when an external protocol fixes the paths and the API is small (a Cargo registry), one flat `router()` lists the protocol's literal paths and files are named after the resource.
 - Shared HTTP parts live under `http/` — extractors, middleware, response and error conversion. Domain logic lives in its own modules and returns `bool`, `Option`, or `anyhow::Result`; the handler attaches the HTTP status at the point of failure.
 - Handlers take `ctx: Context`, where `pub type Context = axum::extract::State<State>;`. Path parameters arrive through typed extractors with exact field names (`ProblemId { problem_id }`, `Release { name, version }`) that reach state through `FromRef`, so extractors never know the route tree.
-- The binary only wires the runtime: `lambda_http::run(router().await?)`. A non-HTTP consumer is one top-level library type with `init` and `handle`, not a route.
-
-## Documentation
-
-Libraries document their public surface; application code does not carry comments the flow already explains, keeping only facts the code cannot show (an external wire format, a deliberate absence). `///` doc comments in Korean, one declarative sentence ending in 다, technical nouns in English: `/// 진행 event를 중계하고 최종 판정을 뽑는다.` Korean particles attach to English or code tokens without a space (`event를`, `` `Status`로 ``). Module `//!` charters state what code cannot show: an invariant, a deliberate absence ("별도 watchdog을 두지 않는다"), a boundary contract, a cancellation-safety guarantee. In libraries, document public types, public functions, and fields whose meaning names and units do not carry; leave private items bare. Never restate the next line; no TODOs, banners, or commented-out code. Route handlers carry one behavior sentence, never the method or path the router already declares.
+- The binary only wires the runtime around `router()`.
 
 ## Tests
 
-Boundary tests assert exact edges (`expires_at == now` rejects; the entrance boundary admits). Protocol tests feed adversarial input: oversized payloads split at awkward chunk boundaries, mid-prefix, mid-token. Offline first — fixtures may assemble real clients that never perform I/O (test credentials, `capture_request` harnesses, `#[cfg(test)]` stub constructors). Tests sit at the bottom of the file (`mod tests`) or in a sibling `tests.rs` the module declares; either is fine. Sample data stays inline in the test module (`json!`) rather than in a `tests/fixtures/` tree. Test names state the invariant (`scored_requests_never_return_test_io`). Use the shared test-retirement rule in `SKILL.md` and explain why a retired test no longer adds coverage.
+Boundary tests assert exact edges (`expires_at == now` rejects; the entrance boundary admits). Offline first — fixtures may assemble real clients that never perform I/O (test credentials, `capture_request` harnesses, `#[cfg(test)]` stub constructors). Sample data stays inline in the test module (`json!`) rather than in a `tests/fixtures/` tree. Test names state the invariant (`scored_requests_never_return_test_io`). Use the shared test-retirement rule in `SKILL.md` and explain why a retired test no longer adds coverage.
 
 ## Verify
 
-Follow the verification rule in `SKILL.md`: `cargo fmt --check`, clippy on touched crates, and focused tests as the risk calls for; cross-crate behavior may need the workspace suite. Unit tests live beside pure judgments — parsing, scoring, state transitions, validators.
+Follow the verification rule in `SKILL.md`: `cargo fmt --check`, clippy on touched crates, and focused tests as the risk calls for; cross-crate behavior may need the workspace suite.

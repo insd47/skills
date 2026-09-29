@@ -8,8 +8,8 @@
     {
       "name": "insd47",
       "source": "./plugins/insd47",
-      "description": "개인 개발 원칙, 언어별 구현 규칙과 커밋 컨벤션을 제공하는 스킬",
-      "version": "0.9.2",
+      "description": "개인 개발 원칙과 언어별 구현 규칙(build), 문서·주석·커밋 작성 규칙(write)을 제공하는 스킬",
+      "version": "0.10.0",
       "category": "development"
     },
     {

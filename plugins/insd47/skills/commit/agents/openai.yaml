@@ -1,4 +1,0 @@
-interface:
-  display_name: "Commit"
-  short_description: "Write commits in my Korean noun-form convention"
-  default_prompt: "Use $insd47:commit to commit these changes with my commit convention."

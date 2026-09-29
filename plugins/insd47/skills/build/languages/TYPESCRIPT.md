@@ -58,20 +58,6 @@ const beta = $beta.run(alpha);
 
 Accept a small requirements-irrelevant cost for a clearer top-level narrative; never claim a performance motivation without measurement.
 
-## Infrastructure symmetry
-
-Sibling infrastructure modules in equivalent roles share one public shape:
-
-```ts
-export function run() {
-  return { resource };
-}
-
-export type Module = ReturnType<typeof run>;
-```
-
-The top-level configuration imports modules, constructs independent groups, then passes outputs into dependent groups; provider details stay in the owning child; add an intermediate composition module when a category outgrows the root. Do not manufacture this shape for isolated files with no composition role.
-
 ## Errors
 
 Framework-native exceptions and validation failures when callers only need success or failure; discriminated errors or result unions when callers decide differently per failure. Parse, don't validate: consume unknown external data through a schema named `scheme` at the boundary and keep internal values inferred from it — past the boundary the type system carries the proof. Include the offending value in boundary error messages. No `unknown`, casts, or duplicated DTOs inside the application.
@@ -94,7 +80,7 @@ Follow the repository formatter; within it keep the vertical rhythm from `SKILL.
 
 One import block, no blank lines inside; inline the `type` modifier when mixing (`import { use, type ComponentProps } from 'react'`); `import type` for type-only modules.
 
-Almost no inline comments. Exported functions, hooks, and non-obvious components get a short JSDoc in Korean with technical nouns in English and particles attached without a space (`hook을`); document a destructured option as `@param property`, never `@param param0.property`. No commented-out code. Favor early returns; keep an existing order that tells a clearer story.
+Favor early returns; keep an existing order that tells a clearer story.
 
 ## Verify
 

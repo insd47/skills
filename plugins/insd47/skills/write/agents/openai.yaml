@@ -1,0 +1,4 @@
+interface:
+  display_name: "Write"
+  short_description: "Write docs, comments, errors, and commits in my style"
+  default_prompt: "Use $insd47:write to write this document, comment, or commit in my style."

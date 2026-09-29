@@ -1,7 +1,7 @@
 {
   "name": "insd47",
-  "version": "0.9.2",
-  "description": "개인 개발 원칙, 언어별 구현 규칙과 커밋 컨벤션을 제공하는 스킬",
+  "version": "0.10.0",
+  "description": "개인 개발 원칙과 언어별 구현 규칙(build), 문서·주석·커밋 작성 규칙(write)을 제공하는 스킬",
   "author": {
     "name": "황인성",
     "url": "https://github.com/insd47"
@@ -11,15 +11,15 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "insd47 Skills",
-    "shortDescription": "개인 개발 원칙, 언어별 구현 규칙과 커밋 컨벤션을 적용합니다.",
-    "longDescription": "황인성의 모듈 경계, 접근제어, 조립, 타입 및 오류 처리 감각을 구현에 적용하고 작업 범위에 맞는 검증으로 마무리하며, 커밋은 개인 커밋 컨벤션으로 작성합니다.",
+    "shortDescription": "개인 개발 원칙과 문서·주석·커밋 작성 규칙을 적용합니다.",
+    "longDescription": "황인성의 모듈 경계, 접근제어, 조립, 타입 및 오류 처리 감각을 구현에 적용하고 작업 범위에 맞는 검증으로 마무리하며, 문서와 주석, 오류 메시지, 커밋은 레포 관례와 한국어 문장 지침에 맞춰 작성합니다.",
     "developerName": "황인성",
     "category": "Developer Tools",
     "capabilities": ["Write"],
     "defaultPrompt": [
       "이 기능을 내 모듈화 원칙에 맞춰 구현해 줘.",
       "이 코드를 구조적으로 깔끔하게 리팩터링해 줘.",
-      "변경 사항을 내 커밋 컨벤션으로 커밋해 줘."
+      "이 변경 사항에 맞춰 README를 갱신하고 커밋해 줘."
     ]
   }
 }
