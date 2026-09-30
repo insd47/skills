@@ -4,7 +4,7 @@ Apply with `SKILL.md` when TypeScript or TSX files are in scope.
 
 ## Exports
 
-React components: default export for the file's one canonical component; named exports for an intentional family of equal peers (renderers, primitives); subordinate components stay private. Other modules: named exports for peer operations; default export for one canonical configured value. No broad barrels — import from the module that owns the concept.
+React components: default export for the file's one canonical component; named exports for an intentional family of equal peers (renderers, primitives); subordinate components stay private. Other modules: named exports for peer operations; default export for one canonical configured value. No broad barrels — import from the module that owns the concept. An `index.ts` may `export *` from its siblings when the folder is one vocabulary split across files (infrastructure components, design-system primitives, wire or storage types) and callers use it as a whole; use `export type *` for type-only folders. A published package's entry stays an explicit list, so a new export in a child does not silently become public API. Never re-export an external package wholesale.
 
 ## Component files
 

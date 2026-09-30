@@ -56,6 +56,7 @@ Whether a comment exists depends on who reads the code.
   // 확인에 실패하면 취소되지 않은 것으로 처리합니다. 취소는 리소스 절약을 위한 것이며, 안전장치가 아닙니다.
   ```
 
+- A comment explains the block it heads as a whole: a group of related constants or statements gets one comment above it, never comments interleaved inside the group. A comment that explains a single value moves to the code that uses it, where it also explains that code.
 - Record a deliberate, non-obvious choice where a future reader would otherwise undo it, including two similar paths that coexist on purpose; put it exactly where that reader will look. Routine decisions need no catalog of rejected alternatives.
 - Existing comments belong to the maintainer, who often edits them by hand. During structural work, move them with their code instead of deleting them, and report the locations of any that became stale.
 - Never restate the next line. No TODOs, banners, or commented-out code. A route handler carries at most one behavior sentence, never the method or path the router already declares. In JSDoc, document a destructured option as `@param property`, not `@param param0.property`.
